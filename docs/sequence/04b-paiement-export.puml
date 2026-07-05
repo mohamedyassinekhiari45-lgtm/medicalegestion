@@ -1,0 +1,63 @@
+@startuml
+title Paiement et export de facture
+
+hide footbox
+autonumber
+
+actor Receptionniste as Rec
+participant "FactureController" as FC
+participant Facture as FM
+participant Paiement as PM
+participant User as UserM
+participant ActivityLog as Log
+
+== Enregistrer un paiement ==
+Rec -> FC: POST factures/{facture}/paiement\n(montant, mode_reglement, reference)
+activate FC
+
+FC -> PM: create(facture_id, encaisse_par=Auth::id(),\n  montant, mode_reglement, reference,\n  date_paiement=today)
+activate PM
+PM --> FC: $paiement
+deactivate PM
+
+FC -> FM: paiements().sum(montant)
+activate FM
+FM --> FC: $totalPaye
+deactivate FM
+
+FC -> FM: update(montant_paye=$totalPaye,\n  statut_paiement = $totalPaye >= montant_total ? 'paye' : 'partiel')
+activate FM
+FM --> FC
+deactivate FM
+
+FC -> UserM: where(role = admin).get()
+activate UserM
+UserM --> FC: $admins
+deactivate UserM
+
+FC -> UserM: notifier PaiementRecu aux admins
+activate UserM
+UserM --> FC
+deactivate UserM
+
+FC -> Log: log('update', 'Paiement de ... DT enregistre...')
+activate Log
+Log --> FC
+deactivate Log
+
+FC --> Rec: "Paiement enregistre. Recu #N"
+deactivate FC
+
+== Exporter PDF ==
+Rec -> FC: GET factures/{facture}/pdf
+activate FC
+
+FC -> FM: load(consultation.patient,\n  consultation.medecin,\n  consultation.tarifs, paiements)
+activate FM
+FM --> FC: $donnees
+deactivate FM
+
+FC --> Rec: download facture-{numero}.pdf
+deactivate FC
+
+@enduml

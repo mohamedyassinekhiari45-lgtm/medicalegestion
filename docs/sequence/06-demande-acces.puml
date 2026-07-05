@@ -1,0 +1,39 @@
+@startuml
+title Demande d'accès au dossier médical (collègue → propriétaire)
+
+actor "Médecin B\n(demandeur)" as MedB
+participant "DossierMedical\nController" as DMC
+participant "Patient (Model)" as PatM
+participant "DossierMedical\n(Model)" as DM
+participant "ShareRequest\n(Model)" as SR
+participant "User (Model)" as UserM
+participant "DemandePartage\n(Notification)" as NotifDP
+
+== Consultation du dossier ==
+MedB -> DMC: GET /patients/{patient}/dossier
+DMC -> DM: firstOrCreate(patient_id)
+DMC -> DMC: Calcule $requestableMedecins\n(médecins avec contenu verrouillé, sans autorisation ni demande en attente)
+DMC --> MedB: Page dossier avec section "Demander l'accès"
+
+== Demande d'accès via select ==
+MedB -> DMC: POST /patients/{patient}/dossier/demander-acces\n(medecin_id = propriétaire)
+
+DMC -> UserM: findOrFail(medecin_id)
+alt destinataire non médecin
+    DMC --> MedB: back() "Vous ne pouvez demander l'accès qu'à un médecin."
+else demande envers soi-même
+    DMC --> MedB: back() "Vous ne pouvez pas vous demander l'accès à vous-même."
+else déjà autorisé
+    DMC -> DM: authorizations()->where('medecin_id',MedB)->where('autorise_par',$id)->exists()
+    DMC --> MedB: back() "Vous avez déjà accès à la section de ce médecin."
+else demande déjà en attente
+    DMC -> SR: where('from_medecin_id',$id)->where('to_medecin_id',MedB)->where('statut','en_attente')->exists()
+    DMC --> MedB: back() "Une demande est déjà en attente."
+else
+    DMC -> SR: create(dossier_medical_id,\n  from=MedA, to=MedB,\n  requester=MedB, statut='en_attente')
+    SR --> DMC: $shareRequest
+    DMC -> NotifDP: notify(MedA)  "Dr MedB demande l'accès à votre section..."
+    DMC --> MedB: back() "Demande d'accès envoyée à Dr MedA."
+end
+
+@enduml

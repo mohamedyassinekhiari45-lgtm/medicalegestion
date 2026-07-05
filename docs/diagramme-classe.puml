@@ -1,0 +1,263 @@
+@startuml
+!theme plain
+
+skinparam class {
+    BackgroundColor #f8f9fa
+    BorderColor #333
+    AttributeFontSize 11
+    FontSize 12
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' User
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class User {
+    - id: int
+    - name: string
+    - prenom: string
+    - date_naissance: date
+    - email: string
+    - email_verified_at: timestamp
+    - password: string
+    - role: string [admin|medecin|receptionniste]
+    - telephone: string
+    - statut: boolean
+    - pending_email: string
+    - email_verification_code: string
+    - avatar: string
+    - google2fa_secret: text
+    - google2fa_enabled: boolean
+    - google2fa_pending: boolean
+    - google2fa_pending_secret: text
+    - last_seen_at: timestamp
+    - remember_token: string
+    + estAdmin(): boolean
+    + estMedecin(): boolean
+    + estReceptionniste(): boolean
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Patient
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Patient {
+    - id: int
+    - numero_dossier: string
+    - nom: string
+    - prenom: string
+    - email: string
+    - telephone: string
+    - adresse: text
+    - date_naissance: date
+    - sexe: string
+    - deleted_at: timestamp
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' RendezVous
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class RendezVous {
+    - id: int
+    - patient_id: int
+    - medecin_id: int
+    - cree_par: int
+    - date_rdv: date
+    - heure_rdv: time
+    - motif: string
+    - statut: enum [planifie|confirme|annule|termine|en_cours]
+    - notes: text
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Consultation
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Consultation {
+    - id: int
+    - rendez_vous_id: int
+    - medecin_id: int
+    - patient_id: int
+    - date_consultation: date
+    - constantes: json
+    - diagnostic: text
+    - observations: text
+    - statut: enum [en_cours|termine|facture]
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Tarif
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Tarif {
+    - id: int
+    - code_nomenclature: string
+    - acte: string
+    - montant_ht: decimal
+    - tva: decimal
+    - montant_ttc: decimal
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Facture
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Facture {
+    - id: int
+    - consultation_id: int
+    - genere_par: int
+    - numero_facture: string
+    - montant_total: decimal
+    - montant_paye: decimal
+    - statut_paiement: enum [impaye|partiel|paye]
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Paiement
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Paiement {
+    - id: int
+    - facture_id: int
+    - encaisse_par: int
+    - montant: decimal
+    - mode_reglement: string
+    - reference: string
+    - date_paiement: date
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Specialite
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class Specialite {
+    - id: int
+    - libelle: string
+    - description: text
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' DossierMedical
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class DossierMedical {
+    - id: int
+    - patient_id: int
+    - notes_generales: text
+    - date_ouverture: date
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' DocumentMedical
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class DocumentMedical {
+    - id: int
+    - dossier_medical_id: int
+    - type: enum [ordonnance|bilan|radio|compte_rendu|autre]
+    - titre: string
+    - description: text
+    - fichier: string
+    - uploaded_by: int
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' DossierAuthorization
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class DossierAuthorization {
+    - id: int
+    - dossier_medical_id: int
+    - medecin_id: int
+    - autorise_par: int
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' ShareRequest
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class ShareRequest {
+    - id: int
+    - dossier_medical_id: int
+    - from_medecin_id: int
+    - to_medecin_id: int
+    - requester_id: int
+    - notes_partagees: json
+    - documents_partagees: json
+    - statut: enum [en_attente|acceptee|refusee]
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' ActivityLog
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class ActivityLog {
+    - id: int
+    - user_id: int
+    - action: string
+    - entity_type: string
+    - entity_id: int
+    - description: text
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Pivot tables
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+class medecin_specialite <<pivot>> {
+    - user_id: int
+    - specialite_id: int
+}
+
+class consultation_tarif <<pivot>> {
+    - consultation_id: int
+    - tarif_id: int
+}
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Associations
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+' User -> RendezVous (medecin)
+User "1" -- "0..*" RendezVous : medecin (medecin_id)
+' User -> RendezVous (cree_par)
+User "1" -- "0..*" RendezVous : createur (cree_par)
+' User -> Consultation
+User "1" -- "0..*" Consultation : medecin (medecin_id)
+' User -> Facture
+User "1" -- "0..*" Facture : genere_par
+' User -> Paiement
+User "1" -- "0..*" Paiement : encaisse_par
+' User -> DossierAuthorization (medecin)
+User "1" -- "0..*" DossierAuthorization : medecin (medecin_id)
+' User -> DossierAuthorization (autorise_par)
+User "1" -- "0..*" DossierAuthorization : autorise_par
+' User -> ShareRequest (from)
+User "1" -- "0..*" ShareRequest : fromMedecin (from_medecin_id)
+' User -> ShareRequest (to)
+User "1" -- "0..*" ShareRequest : toMedecin (to_medecin_id)
+' User -> ShareRequest (requester)
+User "1" -- "0..*" ShareRequest : requester (requester_id)
+' User -> ActivityLog
+User "1" -- "0..*" ActivityLog
+' User <-> Specialite (pivot)
+User "0..*" -- "0..*" Specialite : << medecin_specialite >>
+
+' Patient -> RendezVous
+Patient "1" -- "0..*" RendezVous
+' Patient -> Consultation
+Patient "1" -- "0..*" Consultation
+' Patient -> DossierMedical
+Patient "1" -- "0..1" DossierMedical
+
+' RendezVous -> Consultation
+RendezVous "0..1" -- "1" Consultation
+
+' Consultation -> Facture
+Consultation "1" -- "0..1" Facture
+' Consultation <-> Tarif (pivot)
+Consultation "0..*" -- "0..*" Tarif : << consultation_tarif >>
+
+' Facture -> Paiement
+Facture "1" -- "0..*" Paiement
+
+' DossierMedical -> DocumentMedical
+DossierMedical "1" -- "0..*" DocumentMedical
+' DossierMedical -> DossierAuthorization
+DossierMedical "1" -- "0..*" DossierAuthorization
+' DossierMedical -> ShareRequest
+DossierMedical "1" -- "0..*" ShareRequest
+' DossierMedical -> User (via authorization)
+DossierMedical "0..*" -- "0..*" User : autorise << dossier_authorizations >>
+
+' DocumentMedical -> User (uploader)
+User "1" -- "0..*" DocumentMedical : uploaded_by
+
+@enduml

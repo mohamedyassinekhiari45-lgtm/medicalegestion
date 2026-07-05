@@ -1,0 +1,55 @@
+@startuml
+title Authentification avec 2FA (TOTP)
+
+actor "Utilisateur" as User
+participant "Login" as Login
+participant "AuthController" as Auth
+participant "User (Model)" as UserM
+participant "Google2FA" as G2FA
+participant "Session" as Sess
+participant "ActivityLog" as Log
+participant "Dashboard" as Dash
+
+User -> Login: GET / (showLogin)
+Login --> User: Page de connexion
+
+User -> Login: POST / (email, password)
+Login -> Auth: login()
+Auth -> UserM: where('email', $email)->first()
+UserM --> Auth: $user
+
+alt email ou mot de passe incorrect
+    Auth --> Login: back() avec errors
+    Login --> User: "Identifiants incorrects."
+else compte désactivé
+    Auth --> Login: back() avec errors
+    Login --> User: "Votre compte est désactivé."
+else 2FA activé
+    Auth -> Sess: put('2fa:user:id', $user->id)
+    Auth --> User: redirect /2fa-challenge
+    User -> Login: GET /2fa-challenge
+    Login --> User: Page code TOTP (6 chiffres)
+    User -> Login: POST /2fa-challenge (code)
+    Login -> Auth: verify2fa()
+    Auth -> UserM: find($userId)
+    UserM --> Auth: $user
+    Auth -> G2FA: verifyKey(secret, code)
+    G2FA --> Auth: true/false
+    alt code invalide
+        Auth --> Login: back() "Code 2FA invalide."
+        Login --> User: Message d'erreur
+    else code valide
+        Auth -> Sess: forget('2fa:user:id')
+        Auth -> Auth: Auth::login($user)
+        Auth -> Log: log('login', 'Connexion (2FA)')
+        Auth --> User: redirect /dashboard
+        User -> Dash: Accès dashboard
+    end
+else pas de 2FA
+    Auth -> Auth: Auth::login($user)
+    Auth -> Log: log('login', 'Connexion')
+    Auth --> User: redirect /dashboard
+    User -> Dash: Accès dashboard
+end
+
+@enduml

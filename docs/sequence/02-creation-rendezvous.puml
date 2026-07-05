@@ -1,0 +1,36 @@
+@startuml
+title Création d'un rendez-vous
+
+actor "Réceptionniste" as Receptionniste
+participant "RendezVous\nController" as RVC
+participant "Patient (Model)" as PatM
+participant "User (Model)" as UserM
+participant "Specialite" as Spec
+participant "RendezVous\n(Model)" as RVM
+participant "NouveauRendezVous\n(Notification)" as Notif
+participant "ActivityLog" as Log
+
+Receptionniste -> RVC: GET /rendez-vous/create
+RVC -> PatM: all()
+RVC -> UserM: where('role','medecin')->get()
+RVC -> Spec: all()
+RVC --> Receptionniste: Formulaire création (patients, médecins, spécialités)
+
+Receptionniste -> RVC: POST /rendez-vous\n(patient_id, medecin_id, date_rdv, heure_rdv, motif)
+RVC -> RVC: Validation
+RVC -> RVM: where('medecin_id',$id)\n  ->whereDate('date_rdv',$date)\n  ->whereTime('heure_rdv',$heure)\n  ->exists()
+RVM --> RVC: true/false
+
+alt conflit de créneau
+    RVC --> Receptionniste: back() "Ce créneau est déjà réservé."
+else créneau libre
+    RVC -> RVM: create(data + statut='planifie', cree_par=Auth::id())
+    RVM --> RVC: $rendezVous
+    RVC -> UserM: find($medecin_id)
+    UserM --> RVC: $medecin
+    RVC -> Notif: notify($rendezVous)
+    RVC -> Log: log('create', 'Rendez-vous planifié...')
+    RVC --> Receptionniste: redirect /rendez-vous\n"Rendez-vous planifié avec succès."
+end
+
+@enduml

@@ -1,0 +1,51 @@
+@startuml
+title Generation de la facture
+
+hide footbox
+autonumber
+
+actor Medecin as Doc
+participant "FactureController" as FC
+participant Consultation as CM
+participant Facture as FM
+
+Doc -> FC: POST consultations/{consultation}/facture
+activate FC
+
+FC -> CM: verifier statut = termine
+activate CM
+CM --> FC: true/false
+deactivate CM
+
+FC -> CM: verifier pas de facture existante
+activate CM
+CM --> FC: true/false
+deactivate CM
+
+alt statut != termine ou facture existe
+    FC --> Doc: Erreur "Consultation deja facturee ou non terminee"
+else
+    FC -> CM: tarifs.sum(montant_ttc)
+    activate CM
+    CM --> FC: $montant
+    deactivate CM
+
+    alt montant <= 0
+        FC --> Doc: Erreur "Ajoutez des prestations a la consultation avant de facturer."
+    else
+        FC -> FM: create(consultation_id, numero_facture,\n  montant_total=$montant, montant_paye=0,\n  statut_paiement='genere', genere_par=Auth::id())
+        activate FM
+        FM --> FC: $facture
+        deactivate FM
+
+        FC -> CM: update(statut = facture)
+        activate CM
+        CM --> FC
+        deactivate CM
+
+        FC --> Doc: redirect factures.show
+    end
+end
+deactivate FC
+
+@enduml

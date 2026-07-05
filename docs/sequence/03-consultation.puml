@@ -1,0 +1,50 @@
+@startuml
+title Cycle de vie d'une consultation
+
+actor "Médecin" as Med
+participant "RendezVous\nController" as RVC
+participant "Consultation\nController" as CC
+participant "RendezVous\n(Model)" as RVM
+participant "Consultation\n(Model)" as CM
+participant "Tarif (Model)" as Tarif
+participant "ConsultationTerminee\n(Notification)" as NotifCT
+participant "FactureImpayee\n(Notification)" as NotifFI
+participant "PrestationsModifiees\n(Notification)" as NotifPM
+participant "ActivityLog" as Log
+
+== Confirmation du rendez-vous ==
+Med -> RVC: POST /rendez-vous/{id}/confirm
+RVC -> RVM: update(['statut'=>'confirme'])
+RVC -> Log: log('update', 'Rendez-vous confirmé')
+RVC --> Med: redirect /dashboard "Rendez-vous confirmé."
+
+== Démarrage de la consultation ==
+Med -> CC: POST /consultations/start\n(patient_id, rendez_vous_id)
+CC -> RVM: findOrFail(rendez_vous_id)
+CC -> RVM: update(['statut'=>'en_cours'])
+CC -> CM: create(patient_id, medecin_id, date_consultation=now, statut='en_cours')
+CM --> CC: $consultation
+CC --> Med: redirect consultations/{id}/edit
+
+== Saisie des constantes et diagnostic ==
+Med -> CC: PUT /consultations/{id}\n(constantes[tension,pouls,temperature], diagnostic, observations)
+CC -> CM: update($data)
+CC --> Med: "Consultation mise à jour."
+
+== Ajout de tarifs intermédiaire ==
+Med -> CC: PUT /consultations/{id}\n(tarifs=[id1,id2,...])
+CC -> CM: tarifs()->sync($tarifsSync)
+CC -> NotifPM: notify(receptionnistes et admins)
+CC --> Med: "Consultation mise à jour."
+
+== Terminer la consultation ==
+Med -> CC: PUT /consultations/{id}\n(action='terminer', tarifs=[...])
+CC -> CM: tarifs()->sync($tarifs)
+CC -> CM: update(['statut'=>'termine'])
+CC -> RVM: update(['statut'=>'termine'])
+CC -> NotifCT: notify(receptionnistes et admins)
+CC -> NotifFI: notify(admins)
+CC -> Log: log('update', 'Consultation terminée...')
+CC --> Med: redirect /consultations/{id}\n"Consultation terminée avec succès."
+
+@enduml
