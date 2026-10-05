@@ -76,12 +76,18 @@
         <div class="card animate-fade-up mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-file-earmark"></i> Mes documents ({{ $mesDocs->count() }})</span>
-                @if($peutAutoriser && $mesDocs->isNotEmpty())
-                <div>
-                    <input type="checkbox" id="selectAllDocs" class="form-check-input me-1">
-                    <label for="selectAllDocs" class="form-check-label small">Tout sélectionner</label>
+                <div class="d-flex align-items-center gap-2">
+                    @if($peutAutoriser && $mesDocs->isNotEmpty())
+                    <div>
+                        <input type="checkbox" id="selectAllDocs" class="form-check-input me-1">
+                        <label for="selectAllDocs" class="form-check-label small">Tout sélectionner</label>
+                    </div>
+                    @endif
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse"
+                        data-bs-target="#addDocumentForm" aria-expanded="false" aria-controls="addDocumentForm">
+                        <i class="bi bi-upload"></i> Ajouter un document
+                    </button>
                 </div>
-                @endif
             </div>
             <div class="card-body">
                 <div class="collapse mb-3" id="addDocumentForm">
