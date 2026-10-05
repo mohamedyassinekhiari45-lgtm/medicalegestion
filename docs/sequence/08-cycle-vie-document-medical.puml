@@ -1,0 +1,80 @@
+@startuml
+title Cycle de vie d'un document médical (médecin propriétaire)
+
+actor "Médecin\n(propriétaire)" as Med
+participant "DossierMedical\nController" as DMC
+participant "DocumentMedical\n(Model)" as DM
+participant "Disque\n(storage/public)" as Disk
+
+== Dépôt d'un document ==
+Med -> DMC: POST /patients/{patient}/dossier/documents\n(type, titre, description, fichier)
+DMC -> DMC: Vérifie role=medecin (middleware)
+
+alt fichier absent
+    DMC --> Med: back() "Le document n'a pas pu être enregistré."
+else type de fichier refusé (mimes: pdf,jpg,jpeg,png,doc,docx)
+    DMC --> Med: back() erreurs de validation
+else titre absent ou >255 caractères
+    DMC --> Med: back() erreurs de validation
+else validation OK
+    DMC -> Disk: store('documents_medicaux', 'public')
+    Disk --> DMC: chemin du fichier stocké
+    DMC -> DM: create(patient_id, uploaded_by=Med, type, titre,\n  description, fichier)
+    DM --> DMC: $document
+    DMC --> Med: back() "Document ajouté à votre section du dossier."
+end
+
+== Consultation ==
+Med -> DMC: GET /patients/{patient}/dossier
+DMC -> DM: documents du médecin + documents partagés/autorisés
+DMC --> Med: page dossier (boutons Modifier / Supprimer sur ses documents)
+
+== Modification des métadonnées ==
+Med -> DMC: PUT /documents-medicaux/{document}\n(type, titre, description) — sans fichier
+DMC -> DMC: Vérifie uploaded_by == Auth::id()
+alt document d'un autre médecin
+    DMC --> Med: back() "Vous ne pouvez modifier que vos propres documents."
+else
+    DMC -> DM: update(type, titre, description)
+    DMC --> Med: back() "Document modifié." (fichier d'origine conservé)
+end
+
+== Remplacement du fichier ==
+Med -> DMC: PUT /documents-medicaux/{document} + nouveau fichier
+DMC -> DMC: Vérifie uploaded_by == Auth::id()
+DMC -> DMC: Mémorise $ancienFichier
+
+alt nouveau fichier stockable
+    DMC -> Disk: store('documents_medicaux', 'public')
+    Disk --> DMC: $nouveauFichier
+    DMC -> DM: update(...)
+    alt mise à jour en base réussie
+        DMC -> Disk: delete($ancienFichier)
+        DMC --> Med: back() "Document modifié."
+    else échec de la mise à jour
+        DMC -> Disk: delete($nouveauFichier)
+        DMC --> Med: back() "Le document n'a pas pu être modifié." (ancien fichier intact)
+    end
+else stockage impossible
+    DMC --> Med: back() "Le fichier n'a pas pu être enregistré." (ancien fichier intact)
+end
+
+note right of DMC
+  L'ancien fichier n'est supprimé
+  qu'après le succès de la
+  mise à jour en base : aucune perte
+  de document ni de fichier.
+end note
+
+== Suppression ==
+Med -> DMC: DELETE /documents-medicaux/{document}
+DMC -> DMC: Vérifie uploaded_by == Auth::id()
+alt document d'un autre médecin
+    DMC --> Med: back() "Vous ne pouvez supprimer que vos propres documents."
+else
+    DMC -> Disk: delete(fichier)
+    DMC -> DM: delete()
+    DMC --> Med: back() "Document supprimé."
+end
+
+@enduml

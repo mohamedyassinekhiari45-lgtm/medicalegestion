@@ -90,6 +90,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/patients/{patient}/dossier', [DossierMedicalController::class, 'show'])->name('dossiers-medicaux.show')->middleware('role:medecin');
     Route::post('/patients/{patient}/dossier/notes', [DossierMedicalController::class, 'updateNotes'])->name('dossiers-medicaux.notes')->middleware('role:medecin');
     Route::post('/patients/{patient}/dossier/documents', [DossierMedicalController::class, 'storeDocument'])->name('dossiers-medicaux.documents.store')->middleware('role:medecin');
+    Route::put('/documents-medicaux/{document}', [DossierMedicalController::class, 'updateDocument'])->name('dossiers-medicaux.documents.update')->middleware('role:medecin');
     Route::delete('/documents-medicaux/{document}', [DossierMedicalController::class, 'destroyDocument'])->name('dossiers-medicaux.documents.destroy')->middleware('role:medecin');
 
     // Autorisations d'accès au dossier médical

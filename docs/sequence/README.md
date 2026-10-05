@@ -12,6 +12,7 @@
 | 5 | Partage de dossier (propriétaire) | `05-partage-proprietaire.puml` | Médecin A partage ses notes/documents avec Médecin B |
 | 6 | Demande d'accès au dossier | `06-demande-acces.puml` | Médecin B demande l'accès aux notes/documents de Médecin A |
 | 7 | Acceptation / Refus de partage | `07-acceptation-refus-partage.puml` | Le notifié accepte ou refuse une demande de partage |
+| 8 | Cycle de vie d'un document médical | `08-cycle-vie-document-medical.puml` | Dépôt, modification, remplacement de fichier et suppression (propriétaire uniquement) |
 
 ## Visualisation
 

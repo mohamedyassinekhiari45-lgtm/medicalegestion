@@ -159,6 +159,48 @@ class DossierMedicalController extends Controller
         return back()->with('success', 'Document ajouté à votre section du dossier.');
     }
 
+    public function updateDocument(Request $request, DocumentMedical $document)
+    {
+        if ($document->uploaded_by !== Auth::id()) {
+            return back()->with('error', 'Vous ne pouvez modifier que vos propres documents.');
+        }
+
+        $data = $request->validate([
+            'type' => 'required|in:ordonnance,bilan,radio,compte_rendu,autre',
+            'titre' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'fichier' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240',
+        ]);
+
+        $ancienFichier = $document->fichier;
+        $nouveauFichier = null;
+
+        if ($request->hasFile('fichier')) {
+            try {
+                $nouveauFichier = $request->file('fichier')->store('documents_medicaux', 'public');
+            } catch (\Throwable $e) {
+                return back()->with('error', 'Le fichier n\'a pas pu être enregistré. Le document n\'a pas été modifié.');
+            }
+            $data['fichier'] = $nouveauFichier;
+        }
+
+        try {
+            $document->update($data);
+        } catch (\Throwable $e) {
+            if ($nouveauFichier) {
+                Storage::disk('public')->delete($nouveauFichier);
+            }
+            return back()->with('error', 'Le document n\'a pas pu être modifié.');
+        }
+
+        // l'ancien fichier n'est supprime qu'apres la reussite de la mise a jour
+        if ($nouveauFichier && $ancienFichier && $ancienFichier !== $nouveauFichier) {
+            Storage::disk('public')->delete($ancienFichier);
+        }
+
+        return back()->with('success', 'Document modifié.');
+    }
+
     public function destroyDocument(DocumentMedical $document)
     {
         if ($document->uploaded_by !== Auth::id()) {

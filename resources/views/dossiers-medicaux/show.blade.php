@@ -153,6 +153,16 @@
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     @endif
+                                    <button type="button" class="btn btn-sm btn-outline-warning edit-doc-btn"
+                                        data-bs-toggle="modal" data-bs-target="#editDocModal"
+                                        data-id="{{ $doc->id }}"
+                                        data-type="{{ $doc->type }}"
+                                        data-titre="{{ $doc->titre }}"
+                                        data-description="{{ $doc->description }}"
+                                        data-fichier="{{ $doc->fichier ? 'Oui' : 'Non' }}"
+                                        title="Modifier">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
                                     <form method="POST" action="{{ route('dossiers-medicaux.documents.destroy', $doc) }}" style="display:inline" data-confirm="Supprimer ce document ?">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
@@ -491,6 +501,71 @@ document.addEventListener('DOMContentLoaded', function() {
             updateShareState();
         });
     }
+});
+</script>
+@endif
+
+{{-- Modale de modification d'un document --}}
+<div class="modal fade" id="editDocModal" tabindex="-1" aria-labelledby="editDocModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="editDocForm" enctype="multipart/form-data">
+            @csrf
+            @method('PUT')
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editDocModalLabel"><i class="bi bi-pencil"></i> Modifier le document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select name="type" id="editDocType" class="form-select" required>
+                            <option value="ordonnance">Ordonnance</option>
+                            <option value="bilan">Bilan</option>
+                            <option value="radio">Radio / Imagerie</option>
+                            <option value="compte_rendu">Compte rendu</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" name="titre" id="editDocTitre" class="form-control" required maxlength="255">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" id="editDocDescription" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Remplacer le fichier</label>
+                        <input type="file" name="fichier" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                        <div class="form-text" id="editDocFileInfo"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Enregistrer</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if($mesDocs->count() > 0)
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('editDocForm');
+    document.querySelectorAll('.edit-doc-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            form.action = '/documents-medicaux/' + this.dataset.id;
+            document.getElementById('editDocType').value = this.dataset.type;
+            document.getElementById('editDocTitre').value = this.dataset.titre;
+            document.getElementById('editDocDescription').value = this.dataset.description || '';
+            document.getElementById('editDocFileInfo').textContent =
+                this.dataset.fichier === 'Oui'
+                    ? 'Fichier actuel présent. Choisissez un nouveau fichier pour le remplacer, sinon il est conservé.'
+                    : 'Aucun fichier actuellement. Vous pouvez en ajouter un.';
+        });
+    });
 });
 </script>
 @endif
