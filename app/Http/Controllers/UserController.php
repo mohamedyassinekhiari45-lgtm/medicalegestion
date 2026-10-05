@@ -18,6 +18,26 @@ use App\Notifications\ProfilModifie;
 
 class UserController extends Controller
 {
+    /**
+     * Nettoie le champ specialites avant validation.
+     * Le select propose une option vide (""), qui passait tel quel
+     * dans sync() et provoquait une erreur SQL 500.
+     */
+    protected function prepareForValidation(Request $request)
+    {
+        if (!$request->has('specialites')) {
+            return;
+        }
+
+        $ids = collect((array) $request->input('specialites'))
+            ->filter(fn($v) => is_numeric($v) && (int) $v > 0)
+            ->map(fn($v) => (int) $v)
+            ->unique()
+            ->values();
+
+        $request->merge(['specialites' => $ids->all()]);
+    }
+
     public function index(Request $request)
     {
         $query = User::query();
@@ -67,6 +87,8 @@ class UserController extends Controller
             return back()->with('error', 'Seul le super administrateur peut créer un administrateur.');
         }
 
+        $this->prepareForValidation($request);
+
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'prenom' => 'nullable|string|max:255',
@@ -75,6 +97,8 @@ class UserController extends Controller
             'telephone' => 'nullable|string|max:20',
             'role' => 'required|in:admin,medecin,receptionniste',
             'password' => 'required|string|min:8|confirmed',
+            'specialites' => 'nullable|array',
+            'specialites.*' => 'integer|exists:specialites,id',
         ]);
 
         $data['password'] = Hash::make($data['password']);
@@ -91,8 +115,8 @@ class UserController extends Controller
             $user->update(['avatar' => $filename]);
         }
 
-        if ($request->role === 'medecin' && $request->filled('specialites')) {
-            $user->specialites()->sync($request->specialites);
+        if ($request->role === 'medecin') {
+            $user->specialites()->sync($request->input('specialites', []));
         }
 
         ActivityLog::log('create', 'Utilisateur créé : ' . $user->name . ' (' . $user->role . ')', 'user', $user->id);
@@ -118,7 +142,11 @@ class UserController extends Controller
             'prenom' => 'nullable|string|max:255',
             'date_naissance' => 'nullable|date',
             'telephone' => 'nullable|string|max:20',
+            'specialites' => 'nullable|array',
+            'specialites.*' => 'integer|exists:specialites,id',
         ];
+
+        $this->prepareForValidation($request);
 
         if ($request->has('email')) {
             $rules['email'] = 'required|email|unique:users,email,' . $user->id;
@@ -150,8 +178,8 @@ class UserController extends Controller
 
         $user->notify(new ProfilModifie('Votre profil a été mis à jour par un administrateur.'));
 
-        if ($request->role === 'medecin' && $request->filled('specialites')) {
-            $user->specialites()->sync($request->specialites);
+        if ($user->role === 'medecin') {
+            $user->specialites()->sync($request->input('specialites', []));
         } else {
             $user->specialites()->detach();
         }

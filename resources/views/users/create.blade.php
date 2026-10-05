@@ -66,13 +66,15 @@
                     </div>
                     @endif
                     <div class="mb-3" id="specialite-field" style="{{ (isset($role) && $role === 'medecin') || old('role') === 'medecin' ? 'display:block;' : 'display:none;' }}">
-                        <label class="form-label"><i class="bi bi-tags"></i> Spécialité</label>
-                        <select name="specialites[]" class="form-select">
-                            <option value="">-- Sélectionner une spécialité --</option>
+                        <label class="form-label"><i class="bi bi-tags"></i> Spécialité(s)</label>
+                        <select name="specialites[]" class="form-select" multiple size="6">
                             @foreach($specialites as $s)
-                            <option value="{{ $s->id }}" {{ collect(old('specialites'))->contains($s->id) ? 'selected' : '' }}>{{ $s->libelle }}</option>
+                            <option value="{{ $s->id }}" {{ collect(old('specialites', []))->contains($s->id) ? 'selected' : '' }}>{{ $s->libelle }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text">Maintenez Ctrl (ou Cmd) pour choisir plusieurs spécialités.</div>
+                        @error('specialites')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                        @error('specialites.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                     </div>
                     @if(!isset($role))
                     <script>

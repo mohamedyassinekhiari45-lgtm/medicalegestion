@@ -80,13 +80,15 @@
                         </div>
                     </div>
                     <div class="mb-3" id="specialite-edit-field" style="display:none;">
-                        <label class="form-label"><i class="bi bi-tags"></i> Spécialité</label>
-                        <select name="specialites[]" class="form-select">
-                            <option value="">-- Sélectionner une spécialité --</option>
+                        <label class="form-label"><i class="bi bi-tags"></i> Spécialité(s)</label>
+                        <select name="specialites[]" class="form-select" multiple size="6">
                             @foreach($specialites as $s)
                             <option value="{{ $s->id }}" {{ $user->specialites->contains($s->id) ? 'selected' : '' }}>{{ $s->libelle }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text">Maintenez Ctrl (ou Cmd) pour choisir plusieurs spécialités.</div>
+                        @error('specialites')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                        @error('specialites.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                     </div>
                     <script>
                     document.addEventListener('DOMContentLoaded', function() {
