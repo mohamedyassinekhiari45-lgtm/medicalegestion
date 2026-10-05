@@ -99,6 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/patients/{patient}/dossier/demander-acces', [DossierMedicalController::class, 'requestAccess'])->name('dossiers-medicaux.request-access')->middleware('role:medecin');
     Route::post('/partages/{shareRequest}/accepter', [DossierMedicalController::class, 'acceptShare'])->name('dossiers-medicaux.accept-share')->middleware('role:medecin');
     Route::post('/partages/{shareRequest}/refuser', [DossierMedicalController::class, 'refuseShare'])->name('dossiers-medicaux.refuse-share')->middleware('role:medecin');
+      Route::delete('/partages/{shareRequest}/annuler', [DossierMedicalController::class, 'cancelShare'])->name('dossiers-medicaux.cancel-share')->middleware('role:medecin');
     Route::delete('/dossier-authorizations/{authorization}', [DossierMedicalController::class, 'revokeAccess'])->name('dossiers-medicaux.revoke')->middleware('role:medecin,admin');
 
     Route::get('/statistiques', [StatistiqueController::class, 'index'])->name('statistiques.index')->middleware('role:admin');

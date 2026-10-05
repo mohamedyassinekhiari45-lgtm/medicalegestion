@@ -13,7 +13,7 @@ participant "Notification\n(DB)" as Notif
 MedA -> DMC: GET /patients/{patient}/dossier
 DMC -> DM: firstOrCreate(patient_id)
 DMC -> SR: where('dossier_medical_id',$id)\n  ->where('to_medecin_id',MedA)\n  ->orWhere('from_medecin_id',MedA)\n  ->where('statut','en_attente')
-DMC --> MedA: page dossier\n+ tableau "Demandes de partage reçues"\n+ boutons Accepter / Refuser
+DMC --> MedA: page dossier\n+ "Demandes d'accès reçues"\n+ périmètre demandé (Notes / Documents)\n+ boutons Accepter / Refuser
 
 == Le demandeur ne peut pas se faire accepter sa demande ==
 MedB -> DMC: POST /partages/{shareRequest}/accepter
@@ -29,10 +29,17 @@ DMC -> SR: findOrFail($shareRequest)
 DMC -> DMC: Vérifie from_medecin_id == Auth::id()\n(sinon refus : propriétaire uniquement)
 DMC -> DMC: Vérifie statut = 'en_attente'
 DMC -> DM: $shareRequest->dossierMedical
-DMC -> DA: firstOrCreate(\n  dossier_medical_id,\n  medecin_id=$shareRequest->to_medecin_id,\n  autorise_par=$shareRequest->from_medecin_id)
+note right of DMC
+  Le propriétaire accorde exactement
+  le périmètre demandé :
+  - Notes seules      -> partage_notes=1, partage_documents=0
+  - Documents seuls   -> partage_notes=0, partage_documents=1
+  - Notes et documents-> partage_notes=1, partage_documents=1
+end note
+DMC -> DA: updateOrCreate(\n  dossier_medical_id,\n  medecin_id=$shareRequest->to_medecin_id,\n  autorise_par=$shareRequest->from_medecin_id,\n  partage_notes, partage_documents)
 DA --> DMC: $authorization
 DMC -> SR: update(['statut'=>'acceptee'])
-DMC --> MedA: redirect dossier\n"Demande acceptée. Dr MedB peut voir votre section."
+DMC --> MedA: redirect dossier\n"Accès aux [périmètre] du Dr MedA\naccordé à Dr MedB."
 
 == Refus ==
 MedA -> DMC: POST /partages/{shareRequest}/refuser
@@ -47,5 +54,14 @@ MedA -> DMC: POST /dossier-authorizations/{authorization}\n(_method=DELETE)
 DMC -> DA: Vérifie autorise_par == Auth::id()
 DA --> DMC: delete
 DMC --> MedA: redirect dossier\n"Accès révoqué pour le Dr MedB."
+
+note over SR, DA
+  Cycle de vie d'une demande :
+  en_attente -> acceptee | refusee | annulee
+  - refusee  : décision du propriétaire
+  - annulee  : décision du demandeur (bouton "Annuler")
+  Une demande annulee ou refusee n'est plus
+  rejouable, mais une nouvelle demande reste possible.
+end note
 
 @enduml

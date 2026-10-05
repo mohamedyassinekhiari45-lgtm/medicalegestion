@@ -8,6 +8,7 @@ use App\Models\DocumentMedical;
 use App\Models\Patient;
 use App\Models\ShareRequest;
 use App\Models\User;
+use App\Notifications\DemandeAnnulee;
 use App\Notifications\DemandePartage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,6 +48,18 @@ class DossierMedicalController extends Controller
             ->with('error', "Ce patient ne fait pas partie de votre file : consultez-le uniquement depuis « Mes patients ».");
     }
 
+    /**
+     * Libelle du perimetre demande ou accorde.
+     */
+    protected function libellePerimetre(bool $notes, bool $documents): string
+    {
+        if ($notes && $documents) {
+            return 'Notes et documents';
+        }
+
+        return $notes ? 'Notes seules' : 'Documents seuls';
+    }
+
     public function show(Patient $patient)
     {
         if (!$this->estMedecinTraitant($patient)) {
@@ -58,16 +71,18 @@ class DossierMedicalController extends Controller
         $dossier = $this->getDossier($patient);
         $dossier->load('authorizations.medecin.specialites', 'authorizations.autorisePar.specialites');
 
-        $medecinsAutorisesIds = $dossier->authorizations
-            ->where('medecin_id', $user->id)
-            ->pluck('autorise_par')
-            ->toArray();
+        $mesAutorisations = $dossier->authorizations->where('medecin_id', $user->id);
+
+        // Le perimetre accorde peut ne couvrir que les notes ou que les documents.
+        $medecinsAutorisesNotesIds = $mesAutorisations->where('partage_notes', true)->pluck('autorise_par')->toArray();
+        $medecinsAutorisesDocsIds = $mesAutorisations->where('partage_documents', true)->pluck('autorise_par')->toArray();
+        $medecinsAutorisesIds = array_values(array_unique(array_merge($medecinsAutorisesNotesIds, $medecinsAutorisesDocsIds)));
 
         $tousLesDocs = $dossier->documents()->with('uploader')->get();
         $mesDocs = $tousLesDocs->where('uploaded_by', $user->id);
         $docsAutorises = $tousLesDocs->filter(fn($d) =>
             $d->uploaded_by !== $user->id
-            && in_array($d->uploaded_by, $medecinsAutorisesIds)
+            && in_array($d->uploaded_by, $medecinsAutorisesDocsIds)
         );
         $autresDocs = $tousLesDocs->reject(fn($d) =>
             $mesDocs->pluck('id')->contains($d->id)
@@ -127,7 +142,8 @@ class DossierMedicalController extends Controller
 
         return view('dossiers-medicaux.show', compact(
             'dossier', 'patient', 'medecin',
-            'mesDocs', 'docsAutorises', 'autresDocs', 'medecinsAutorisesIds',
+            'mesDocs', 'docsAutorises', 'autresDocs', 'mesAutorisations',
+            'medecinsAutorisesIds', 'medecinsAutorisesNotesIds', 'medecinsAutorisesDocsIds',
             'traitants', 'shareRequests', 'sentRequests', 'requestableMedecins', 'specialites'
         ));
     }
@@ -261,7 +277,22 @@ class DossierMedicalController extends Controller
         }
 
         $user = Auth::user();
-        $data = $request->validate(['medecin_id' => 'required|exists:users,id']);
+        $data = $request->validate([
+            'medecin_id' => 'required|exists:users,id',
+            'notes' => 'nullable',
+            'documents' => 'nullable',
+        ]);
+
+        // Le demandeur choisit ce qu'il veut voir : notes, documents, ou les deux.
+        // Le controle explicite protege contre une requete falsifiee (0/0).
+        $partageNotes = $request->boolean('notes');
+        $partageDocuments = $request->boolean('documents');
+
+        if (!$partageNotes && !$partageDocuments) {
+            return back()->withErrors([
+                'medecin_id' => 'Sélectionnez au moins un élément : les notes, les documents, ou les deux.',
+            ]);
+        }
 
         $medecin = User::findOrFail($data['medecin_id']);
         if ($medecin->role !== 'medecin') {
@@ -294,14 +325,16 @@ class DossierMedicalController extends Controller
             'from_medecin_id' => $medecin->id,
             'to_medecin_id' => $user->id,
             'requester_id' => $user->id,
-            'notes_partagees' => [],
-            'documents_partagees' => [],
+            'notes_partagees' => $partageNotes,
+            'documents_partagees' => $partageDocuments,
             'statut' => 'en_attente',
         ]);
 
         $medecin->notify(new DemandePartage($shareRequest));
 
-        return back()->with('success', 'Demande d\'accès envoyée à Dr ' . $medecin->prenom . ' ' . $medecin->name . '.');
+        $perimetre = $this->libellePerimetre($partageNotes, $partageDocuments);
+
+        return back()->with('success', 'Demande d\'accès aux ' . mb_strtolower($perimetre) . ' du Dr ' . $medecin->prenom . ' ' . $medecin->name . ' envoyée.');
     }
 
     public function acceptShare(ShareRequest $shareRequest)
@@ -320,16 +353,25 @@ class DossierMedicalController extends Controller
 
         $dossier = $shareRequest->dossierMedical;
 
-        DossierAuthorization::firstOrCreate([
+        // Le proprietaire accorde exactement ce qui a ete demande.
+        $partageNotes = $shareRequest->notes_partagees;
+        $partageDocuments = $shareRequest->documents_partagees;
+
+        DossierAuthorization::updateOrCreate([
             'dossier_medical_id' => $dossier->id,
             'medecin_id' => $shareRequest->to_medecin_id,
             'autorise_par' => $shareRequest->from_medecin_id,
+        ], [
+            'partage_notes' => $partageNotes,
+            'partage_documents' => $partageDocuments,
         ]);
 
         $shareRequest->update(['statut' => 'acceptee']);
 
+        $perimetre = $this->libellePerimetre($partageNotes, $partageDocuments);
+
         return redirect()->route('dossiers-medicaux.show', $dossier->patient_id)
-            ->with('success', 'Demande de partage acceptée. Dr ' . $shareRequest->toMedecin->prenom . ' ' . $shareRequest->toMedecin->name . ' peut maintenant voir la section de Dr ' . $shareRequest->fromMedecin->prenom . ' ' . $shareRequest->fromMedecin->name . '.');
+            ->with('success', 'Accès aux ' . mb_strtolower($perimetre) . ' du Dr ' . $shareRequest->fromMedecin->prenom . ' ' . $shareRequest->fromMedecin->name . ' accordé à Dr ' . $shareRequest->toMedecin->prenom . ' ' . $shareRequest->toMedecin->name . '.');
     }
 
     public function refuseShare(ShareRequest $shareRequest)
@@ -349,6 +391,26 @@ class DossierMedicalController extends Controller
 
         return redirect()->route('dossiers-medicaux.show', $shareRequest->dossierMedical->patient_id)
             ->with('success', 'Demande de partage refusée.');
+    }
+
+    public function cancelShare(ShareRequest $shareRequest)
+    {
+        // Seul le demandeur peut annuler sa propre demande, et seulement
+        // tant qu'elle n'a pas ete traitee par le proprietaire.
+        if ((int)$shareRequest->requester_id !== (int)Auth::id()) {
+            return back()->with('error', 'Vous ne pouvez annuler que les demandes que vous avez envoyées.');
+        }
+
+        if ($shareRequest->statut !== 'en_attente') {
+            return back()->with('error', 'Cette demande a déjà été traitée.');
+        }
+
+        $shareRequest->update(['statut' => 'annulee']);
+
+        $shareRequest->fromMedecin->notify(new DemandeAnnulee($shareRequest));
+
+        return redirect()->route('dossiers-medicaux.show', $shareRequest->dossierMedical->patient_id)
+            ->with('success', 'Demande d\'accès annulée.');
     }
 
     public function revokeAccess(Request $request, DossierAuthorization $authorization)

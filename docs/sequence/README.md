@@ -10,8 +10,8 @@
 | 4a | Génération de la facture | `04a-generation-facture.puml` | Le réceptionniste facture une consultation terminée (contrôle doublon, total des prestations) |
 | 4b | Paiement et export | `04b-paiement-export.puml` | Le réceptionniste enregistre un paiement, notifie et exporte le PDF |
 | 5 | Accès au dossier (médecin traitant) | `05-acces-medecin-traitant.puml` | Un patient n'est visible que par les médecins qui l'ont consulté ou ont un RDV : fiche, dossier, notes et documents |
-| 6 | Demande d'accès au dossier | `06-demande-acces.puml` | Médecin B demande l'accès aux notes/documents de Médecin A (jamais de partage direct) |
-| 7 | Acceptation / Refus d'une demande | `07-acceptation-refus-demande.puml` | Seul le propriétaire de la section accepte ou refuse, puis peut révoquer l'accès |
+| 6 | Demande d'accès au dossier | `06-demande-acces.puml` | Le demandeur choisit son périmètre (notes / documents / les deux), envoie la demande, et peut l'annuler |
+| 7 | Acceptation / Refus d'une demande | `07-acceptation-refus-demande.puml` | Seul le propriétaire de la section accorde exactement le périmètre demandé, puis peut révoquer l'accès |
 | 8 | Cycle de vie d'un document médical | `08-cycle-vie-document-medical.puml` | Dépôt, modification, remplacement de fichier et suppression (auteur uniquement) |
 
 ## Règle d'accès au dossier médical
@@ -21,14 +21,17 @@
    (`rendez_vous.medecin_id`). Sinon il est renvoyé vers la liste « Mes patients ».
 2. **Pas de partage direct** : il n'existe plus de case à cocher ni de bouton
    « Partager ». Le partage passe toujours par une demande.
-3. **Demande** : le médecin traitant qui veut lire la section d'un collègue envoie une
-   demande (`06`). La demande porte sur **toute la section** du collègue : ses notes
-   **et** ses documents, qu'il ait déjà écrit ou non. Un médecin qui a déjà été autorisé,
-   ou à qui une demande est déjà en attente, n'est plus proposé.
+3. **Demande avec périmètre** : le médecin traitant qui veut lire la section d'un collègue
+   coche ce qu'il souhaite voir : **les notes**, **les documents**, ou **les deux** (`06`).
+   Le périmètre demandé est mémorisé, et le propriétaire n'accorde que ce qui a été demandé.
+   Un médecin qui a déjà été autorisé, ou à qui une demande est déjà en attente, n'est plus proposé.
 4. **Décision** : seul le propriétaire de la section accepte ou refuse ; le demandeur ne
    peut pas accepter sa propre demande (`07`).
-5. **Réversibilité** : le propriétaire peut révoquer l'accès à tout moment.
-6. **Chacun sa section** : un médecin n'écrit que ses propres notes et ne modifie ou
+5. **Annulation** : le demandeur peut annuler sa propre demande tant qu'elle est en attente.
+   Le propriétaire est alors notifié. Une demande annulée ou refusée n'est plus rejouable,
+   mais une nouvelle demande reste possible.
+6. **Réversibilité** : le propriétaire peut révoquer l'accès à tout moment.
+7. **Chacun sa section** : un médecin n'écrit que ses propres notes et ne modifie ou
    supprime que ses propres documents ; les sections accordées sont en lecture seule.
 
 ## Visualisation

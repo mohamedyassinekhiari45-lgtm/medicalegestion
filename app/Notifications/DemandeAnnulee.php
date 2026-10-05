@@ -2,11 +2,11 @@
 
 namespace App\Notifications;
 
+use App\Models\ShareRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use App\Models\ShareRequest;
 
-class DemandePartage extends Notification
+class DemandeAnnulee extends Notification
 {
     use Queueable;
 
@@ -25,24 +25,16 @@ class DemandePartage extends Notification
     public function toArray($notifiable)
     {
         $patient = $this->shareRequest->dossierMedical->patient;
-        $demandes = [];
-
-        if ($this->shareRequest->notes_partagees) {
-            $demandes[] = 'ses notes';
-        }
-        if ($this->shareRequest->documents_partagees) {
-            $demandes[] = 'ses documents';
-        }
 
         $message = 'Dr ' . ($this->shareRequest->requester->prenom ?? '') . ' ' . ($this->shareRequest->requester->name ?? '')
-            . ' demande l\'accès à ' . implode(' et ', $demandes)
+            . ' a annulé sa demande d\'accès à ' . mb_strtolower($this->shareRequest->perimetreLibelle())
             . ' dans votre section du dossier de ' . ($patient->prenom ?? '') . ' ' . ($patient->nom ?? '') . '.';
 
         return [
-            'title' => 'Demande d\'accès au dossier',
+            'title' => 'Demande d\'accès annulée',
             'message' => $message,
             'url' => route('dossiers-medicaux.show', $patient),
-            'icon' => 'bi-person-plus',
+            'icon' => 'bi-x-circle',
             'share_request_id' => $this->shareRequest->id,
         ];
     }

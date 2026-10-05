@@ -47,12 +47,12 @@
                 @if($medId != Auth::id() && $note)
                 @php
                     $auteur = \App\Models\User::find($medId);
-                    $autorise = in_array($medId, $medecinsAutorisesIds);
+                    $autorise = in_array($medId, $medecinsAutorisesNotesIds);
                 @endphp
                 @if($auteur && $autorise)
                 @php $afficheNotes = true; @endphp
                 <div class="border rounded p-3 mb-2 bg-light">
-                    <small class="text-muted">Dr {{ $auteur->prenom }} {{ $auteur->name }} <span class="badge bg-info">Autorisé</span></small>
+                    <small class="text-muted">Dr {{ $auteur->prenom }} {{ $auteur->name }} <span class="badge bg-info">Notes autorisées</span></small>
                     <p class="mb-0 mt-1">{{ nl2br(e($note)) }}</p>
                 </div>
                 @endif
@@ -167,42 +167,24 @@
 
         @if($shareRequests->isNotEmpty())
         <div class="card animate-fade-up mb-3 border-warning">
-            <div class="card-header bg-warning bg-opacity-10"><i class="bi bi-bell"></i> Demandes de partage reçues</div>
+            <div class="card-header bg-warning bg-opacity-10"><i class="bi bi-bell"></i> Demandes d'accès reçues</div>
             <div class="card-body">
                 @foreach($shareRequests as $sr)
+                @if((int)$sr->from_medecin_id === (int)Auth::id())
                 @php
-                    $ownerInitiated = (int)$sr->requester_id === (int)$sr->from_medecin_id;
-                    $isForMe = (int)$sr->to_medecin_id === (int)Auth::id();
-                    $isFromMe = (int)$sr->from_medecin_id === (int)Auth::id();
+                    $srNotes = $sr->notes_partagees;
+                    $srDocs = $sr->documents_partagees;
                 @endphp
-                @if($ownerInitiated && $isForMe)
-                <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
-                    <div>
-                        <strong>Dr {{ $sr->fromMedecin->prenom }} {{ $sr->fromMedecin->name }}</strong>
-                        <span class="badge bg-secondary">{{ $sr->fromMedecin->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span>
-                        <br><small class="text-muted">
-                            Souhaite partager :
-                            @if(!empty($sr->notes_partagees)) <span class="badge bg-info">Notes</span> @endif
-                            @if(!empty($sr->documents_partagees)) <span class="badge bg-info">{{ count($sr->documents_partagees) }} document(s)</span> @endif
-                        </small>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <form method="POST" action="{{ route('dossiers-medicaux.accept-share', $sr) }}">
-                            @csrf
-                            <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Accepter</button>
-                        </form>
-                        <form method="POST" action="{{ route('dossiers-medicaux.refuse-share', $sr) }}">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i> Refuser</button>
-                        </form>
-                    </div>
-                </div>
-                @elseif(!$ownerInitiated && $isFromMe)
                 <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
                     <div>
                         <strong>Dr {{ $sr->requester->prenom }} {{ $sr->requester->name }}</strong>
                         <span class="badge bg-secondary">{{ $sr->requester->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span>
-                        <br><small class="text-muted">Demande l'accès à VOTRE section du dossier</small>
+                        <br><small class="text-muted">
+                            Demande l'accès à :
+                            @if($srNotes) <span class="badge bg-info">Notes</span> @endif
+                            @if($srDocs) <span class="badge bg-info">Documents</span> @endif
+                            <span class="text-muted">({{ $sr->created_at->format('d/m/Y H:i') }})</span>
+                        </small>
                     </div>
                     <div class="d-flex gap-2">
                         <form method="POST" action="{{ route('dossiers-medicaux.accept-share', $sr) }}">
@@ -227,11 +209,12 @@
             </div>
             <div class="card-body">
                 @if($requestableMedecins->isNotEmpty())
-                <h6 class="text-muted"><i class="bi bi-search"></i> Demander l'accès aux notes et documents d'un médecin</h6>
+                <h6 class="text-muted"><i class="bi bi-search"></i> Demander l'accès aux notes et/ou documents d'un médecin</h6>
                 <div class="border rounded p-3 bg-light">
-                    <form method="POST" action="{{ route('dossiers-medicaux.request-access', $patient) }}" class="row g-2 align-items-end">
+                    <form method="POST" action="{{ route('dossiers-medicaux.request-access', $patient) }}" class="row g-3 align-items-end">
                         @csrf
-                        <div class="col-md-8">
+                        <div class="col-md-6">
+                            <label class="form-label">Médecin</label>
                             <select name="medecin_id" class="form-select" required>
                                 <option value="">-- Choisir un médecin --</option>
                                 @foreach($requestableMedecins as $rm)
@@ -239,14 +222,33 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-auto">
+                        <div class="col-md-6">
+                            <label class="form-label">Éléments demandés</label>
+                            <div class="border rounded p-2 bg-white">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="notes" value="1" id="demandeNotes" checked>
+                                    <label class="form-check-label" for="demandeNotes">Les notes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="documents" value="1" id="demandeDocuments" checked>
+                                    <label class="form-check-label" for="demandeDocuments">Les documents</label>
+                                </div>
+                            </div>
+                            @error('notes')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                            @error('documents')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-12">
                             <button type="submit" class="btn btn-primary"><i class="bi bi-person-plus"></i> Demander l'accès</button>
+                            <div class="form-text mt-1">
+                                Choisissez ce dont vous avez besoin : cochez les notes, les documents, ou les deux.
+                                Le médecin concerné reçoit la demande et décide ce qu'il accorde.
+                            </div>
                         </div>
                     </form>
-                    <div class="form-text mt-2">
-                        Le médecin choisi reçoit la demande et décide de l'accorder ou non.
-                        L'accès porte sur ses notes <em>et</em> ses documents.
-                    </div>
                 </div>
                 @elseif($sentRequests->where('statut', 'en_attente')->isNotEmpty())
                 <div class="alert alert-info py-2 mb-0">
@@ -267,39 +269,40 @@
                 <div class="table-responsive mb-3">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr>
-                                <th>Type</th>
-                                <th>Médecin</th>
-                                <th>Éléments</th>
-                                <th>Statut</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($sentRequests as $sr)
-                            @php
-                                $ownerInitiated = (int)$sr->requester_id === (int)$sr->from_medecin_id;
-                            @endphp
-                            <tr>
-                                <td>@if($ownerInitiated) <span class="badge bg-info">Partage</span> @else <span class="badge bg-warning">Demande</span> @endif</td>
-                                <td>@if($ownerInitiated) Dr {{ $sr->toMedecin->prenom }} {{ $sr->toMedecin->name }} @else Dr {{ $sr->fromMedecin->prenom }} {{ $sr->fromMedecin->name }} @endif</td>
-                                <td>
-                                    @if($ownerInitiated)
-                                        @if(!empty($sr->notes_partagees)) <span class="badge bg-info">Notes</span> @endif
-                                        @if(!empty($sr->documents_partagees)) <span class="badge bg-info">{{ count($sr->documents_partagees) }} document(s)</span> @endif
-                                    @else
-                                        <span class="text-muted">Accès à sa section</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($sr->statut === 'en_attente') <span class="badge bg-warning">En attente</span>
-                                    @elseif($sr->statut === 'acceptee') <span class="badge bg-success">Acceptée</span>
-                                    @else <span class="badge bg-danger">Refusée</span>
-                                    @endif
-                                </td>
-                                <td>{{ $sr->created_at->format('d/m/Y H:i') }}</td>
-                            </tr>
-                            @endforeach
+<tr>
+                                    <th>Médecin</th>
+                                    <th>Éléments demandés</th>
+                                    <th>Statut</th>
+                                    <th>Date</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                          </thead>
+                          <tbody>
+                              @foreach($sentRequests as $sr)
+                              <tr>
+                                  <td>Dr {{ $sr->fromMedecin->prenom }} {{ $sr->fromMedecin->name }}</td>
+                                  <td>
+                                      @if($sr->notes_partagees) <span class="badge bg-info">Notes</span> @endif
+                                      @if($sr->documents_partagees) <span class="badge bg-info">Documents</span> @endif
+                                  </td>
+                                  <td>
+                                      @if($sr->statut === 'en_attente') <span class="badge bg-warning">En attente</span>
+                                      @elseif($sr->statut === 'acceptee') <span class="badge bg-success">Acceptée</span>
+                                      @elseif($sr->statut === 'annulee') <span class="badge bg-secondary">Annulée</span>
+                                      @else <span class="badge bg-danger">Refusée</span>
+                                      @endif
+                                  </td>
+                                  <td>{{ $sr->created_at->format('d/m/Y H:i') }}</td>
+                                  <td class="text-end">
+                                      @if($sr->statut === 'en_attente' && (int)$sr->requester_id === (int)Auth::id())
+                                      <form method="POST" action="{{ route('dossiers-medicaux.cancel-share', $sr) }}" style="display:inline" data-confirm="Annuler votre demande d'accès au Dr {{ $sr->fromMedecin->prenom }} {{ $sr->fromMedecin->name }} ?">
+                                          @csrf @method('DELETE')
+                                          <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i> Annuler</button>
+                                      </form>
+                                      @endif
+                                  </td>
+                              </tr>
+                              @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -314,20 +317,22 @@
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr>
-                                <th>Médecin</th>
-                                <th>Spécialité</th>
-                                <th>Accès à la section de</th>
-                                <th>Date</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($dossier->authorizations as $auth)
-                            <tr>
-                                <td>Dr {{ $auth->medecin->prenom }} {{ $auth->medecin->name }}</td>
-                                <td><span class="badge bg-info">{{ $auth->medecin->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span></td>
-                                <td>Dr {{ $auth->autorisePar->prenom }} {{ $auth->autorisePar->name }} <span class="badge bg-secondary">{{ $auth->autorisePar->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span></td>
+<tr>
+                                  <th>Médecin</th>
+                                  <th>Spécialité</th>
+                                  <th>Accès à la section de</th>
+                                  <th>Éléments accordés</th>
+                                  <th>Date</th>
+                                  <th class="text-end">Action</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              @foreach($dossier->authorizations as $auth)
+                              <tr>
+                                  <td>Dr {{ $auth->medecin->prenom }} {{ $auth->medecin->name }}</td>
+                                  <td><span class="badge bg-info">{{ $auth->medecin->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span></td>
+                                  <td>Dr {{ $auth->autorisePar->prenom }} {{ $auth->autorisePar->name }} <span class="badge bg-secondary">{{ $auth->autorisePar->specialites->pluck('libelle')->implode(', ') ?: 'Généraliste' }}</span></td>
+                                  <td><span class="badge bg-light text-dark">{{ $auth->perimetreLibelle() }}</span></td>
                                 <td>{{ $auth->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="text-end">
                                     @if($auth->autorise_par === Auth::id())
@@ -349,7 +354,7 @@
         @if($docsAutorises->isNotEmpty())
         <div class="card animate-fade-up mb-3">
             <div class="card-header">
-                <span><i class="bi bi-file-earmark-lock"></i> Documents partagés ({{ $docsAutorises->count() }})</span>
+                <span><i class="bi bi-file-earmark-lock"></i> Documents autorisés ({{ $docsAutorises->count() }})</span>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
