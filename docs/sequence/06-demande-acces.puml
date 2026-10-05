@@ -25,7 +25,7 @@ alt MedB n'a pas pris ce patient en charge
 else
     PatM --> DMC: true
     DMC -> DM: firstOrCreate(patient_id)
-    DMC -> DMC: Calcule $requestableMedecins\n(médecins avec contenu verrouillé,\nsans autorisation ni demande en attente)
+    DMC -> DMC: Calcule $requestableMedecins\n= tous les autres medecins traitants,\nmoins ceux qui m'ont deja autorise\net ceux a qui j'ai deja demande
     DMC --> MedB: page du dossier\n+ section "Accès au dossier"
 end
 

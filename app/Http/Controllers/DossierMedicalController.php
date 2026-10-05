@@ -78,18 +78,16 @@ class DossierMedicalController extends Controller
 
         $medecin = $user;
 
-        // All doctors the user can request access from (traitants who have content + not already authorized)
-        $notes = json_decode($dossier->notes_generales ?? '{}', true);
-        $lockedMedecinIds = [];
-        foreach ($notes as $medId => $note) {
-            if ((int)$medId !== (int)$user->id && $note && !in_array((int)$medId, $medecinsAutorisesIds)) {
-                $lockedMedecinIds[] = (int)$medId;
-            }
-        }
-        $lockedDocsIds = $autresDocs->pluck('uploaded_by')->unique()->map(fn($v) => (int)$v)->toArray();
-        $lockedMedecinIds = array_unique(array_merge($lockedMedecinIds, $lockedDocsIds));
+        // On peut demander l'acces a tous les autres medecins traitants du patient,
+        // qu'ils aient deja ecrit quelque chose ou non : une section vide peut etre
+        // remplie plus tard, et l'autorisation se donne sur la section entiere.
+        $traitantIds = $traitants
+            ->where('id', '!=', $user->id)
+            ->pluck('id')
+            ->map(fn($v) => (int)$v)
+            ->toArray();
 
-        // Already have access or pending request from me
+        // On exclut ceux qui m'ont deja autorise et ceux a qui j'ai deja demande.
         $excludeIds = $dossier->authorizations->where('medecin_id', $user->id)->pluck('autorise_par')->map(fn($v) => (int)$v)->toArray();
         $pendingTargetIds = ShareRequest::where('dossier_medical_id', $dossier->id)
             ->where('requester_id', $user->id)
@@ -100,7 +98,7 @@ class DossierMedicalController extends Controller
         $excludeIds = array_unique(array_merge($excludeIds, $pendingTargetIds));
 
         $requestableMedecins = User::with('specialites')
-            ->whereIn('id', $lockedMedecinIds)
+            ->whereIn('id', $traitantIds)
             ->whereNotIn('id', $excludeIds)
             ->get()
             ->map(fn($m) => [

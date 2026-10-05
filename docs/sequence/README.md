@@ -22,7 +22,9 @@
 2. **Pas de partage direct** : il n'existe plus de case à cocher ni de bouton
    « Partager ». Le partage passe toujours par une demande.
 3. **Demande** : le médecin traitant qui veut lire la section d'un collègue envoie une
-   demande (`06`).
+   demande (`06`). La demande porte sur **toute la section** du collègue : ses notes
+   **et** ses documents, qu'il ait déjà écrit ou non. Un médecin qui a déjà été autorisé,
+   ou à qui une demande est déjà en attente, n'est plus proposé.
 4. **Décision** : seul le propriétaire de la section accepte ou refuse ; le demandeur ne
    peut pas accepter sa propre demande (`07`).
 5. **Réversibilité** : le propriétaire peut révoquer l'accès à tout moment.

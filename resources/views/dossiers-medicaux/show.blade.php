@@ -227,7 +227,7 @@
             </div>
             <div class="card-body">
                 @if($requestableMedecins->isNotEmpty())
-                <h6 class="text-muted"><i class="bi bi-search"></i> Demander l'accès aux notes d'un médecin</h6>
+                <h6 class="text-muted"><i class="bi bi-search"></i> Demander l'accès aux notes et documents d'un médecin</h6>
                 <div class="border rounded p-3 bg-light">
                     <form method="POST" action="{{ route('dossiers-medicaux.request-access', $patient) }}" class="row g-2 align-items-end">
                         @csrf
@@ -243,10 +243,22 @@
                             <button type="submit" class="btn btn-primary"><i class="bi bi-person-plus"></i> Demander l'accès</button>
                         </div>
                     </form>
+                    <div class="form-text mt-2">
+                        Le médecin choisi reçoit la demande et décide de l'accorder ou non.
+                        L'accès porte sur ses notes <em>et</em> ses documents.
+                    </div>
+                </div>
+                @elseif($sentRequests->where('statut', 'en_attente')->isNotEmpty())
+                <div class="alert alert-info py-2 mb-0">
+                    <i class="bi bi-info-circle"></i> Vos demandes d'accès sont en attente de réponse : il n'y a pas d'autre médecin à solliciter pour le moment.
+                </div>
+                @elseif(count($medecinsAutorisesIds) > 0)
+                <div class="alert alert-success py-2 mb-0">
+                    <i class="bi bi-check-circle"></i> Vous avez déjà accès aux sections des autres médecins de ce dossier. Le partage reste réversible : ils peuvent révoquer leur accord à tout moment.
                 </div>
                 @else
                 <div class="alert alert-info py-2 mb-0">
-                    <i class="bi bi-info-circle"></i> Vous n'avez pas encore traité ce patient. Une fois que vous aurez des consultations ou rendez-vous, vous pourrez demander l'accès aux sections des autres médecins.
+                    <i class="bi bi-info-circle"></i> Aucun autre médecin ne prend en charge ce patient : il n'y a personne à qui demander un accès.
                 </div>
                 @endif
 
