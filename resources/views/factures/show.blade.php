@@ -55,7 +55,7 @@
                     </tbody>
                 </table>
 
-                @if(in_array(Auth::user()->role, ['admin', 'receptionniste']) && !in_array($facture->statut_paiement, ['paye']))
+                @if(Auth::user()->role === 'receptionniste' && !in_array($facture->statut_paiement, ['paye']))
                 <hr>
                 <h6><i class="bi bi-cash-coin"></i> Enregistrer un paiement</h6>
                 <form method="POST" action="{{ route('factures.paiement', $facture) }}" class="row g-2">

@@ -63,7 +63,7 @@
                                     <button type="submit" class="btn btn-sm btn-success" title="Terminer"><i class="bi bi-check-circle"></i></button>
                                 </form>
                                 @endif
-                                @if(in_array(Auth::user()->role, ['admin', 'receptionniste']) && $c->statut === 'termine' && !$c->facture)
+                                @if(Auth::user()->role === 'receptionniste' && $c->statut === 'termine' && !$c->facture)
                                 <form method="POST" action="{{ route('factures.generate', $c) }}" class="d-inline">
                                     @csrf
                                     <button class="btn btn-sm btn-success" title="Générer facture"><i class="bi bi-receipt"></i></button>

@@ -4,12 +4,12 @@ title Generation de la facture
 hide footbox
 autonumber
 
-actor Medecin as Doc
+actor Receptionniste as Rec
 participant "FactureController" as FC
 participant Consultation as CM
 participant Facture as FM
 
-Doc -> FC: POST consultations/{consultation}/facture
+Rec -> FC: POST consultations/{consultation}/facture
 activate FC
 
 FC -> CM: verifier statut = termine
@@ -23,7 +23,7 @@ CM --> FC: true/false
 deactivate CM
 
 alt statut != termine ou facture existe
-    FC --> Doc: Erreur "Consultation deja facturee ou non terminee"
+    FC --> Rec: Erreur "Consultation deja facturee ou non terminee"
 else
     FC -> CM: tarifs.sum(montant_ttc)
     activate CM
@@ -31,7 +31,7 @@ else
     deactivate CM
 
     alt montant <= 0
-        FC --> Doc: Erreur "Ajoutez des prestations a la consultation avant de facturer."
+        FC --> Rec: Erreur "Ajoutez des prestations a la consultation avant de facturer."
     else
         FC -> FM: create(consultation_id, numero_facture,\n  montant_total=$montant, montant_paye=0,\n  statut_paiement='genere', genere_par=Auth::id())
         activate FM
@@ -43,7 +43,7 @@ else
         CM --> FC
         deactivate CM
 
-        FC --> Doc: redirect factures.show
+        FC --> Rec: redirect factures.show
     end
 end
 deactivate FC

@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Gestion Médicale')</title>
+    <script>
+    (function() {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-bs-theme', 'light');
+        }
+        if (localStorage.getItem('eyeComfort') === '1') {
+            document.documentElement.setAttribute('data-eye-comfort', 'true');
+        }
+    })();
+    </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
@@ -318,11 +332,17 @@
 
     var html = document.documentElement;
 
+    function applyTheme(theme) {
+        var isDark = theme === 'dark';
+        html.setAttribute('data-theme', isDark ? 'dark' : '');
+        html.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('theme', isDark ? 'dark' : '');
+    }
+
     function toggleTheme() {
         var current = html.getAttribute('data-theme') || '';
         var next = current === 'dark' ? '' : 'dark';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
+        applyTheme(next);
         updateThemeIcon(next);
         document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: next } }));
     }
@@ -362,12 +382,13 @@
     (function() {
         var savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark') {
-            html.setAttribute('data-theme', 'dark');
+            applyTheme('dark');
             updateThemeIcon('dark');
         } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            html.setAttribute('data-theme', 'dark');
+            applyTheme('dark');
             updateThemeIcon('dark');
         } else {
+            applyTheme('');
             updateThemeIcon('');
         }
         var savedEye = localStorage.getItem('eyeComfort');
@@ -427,34 +448,6 @@
                 return stream;
             });
         };
-    }
-    var lastVisible = Date.now();
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'hidden' && document.querySelector('.unlock-overlay')) return;
-        var wrapper = document.querySelector('.wrapper');
-        if (!wrapper) return;
-        if (document.hidden) {
-            if (Date.now() - lastVisible < 2000) return;
-            wrapper.style.transition = 'filter 0.3s';
-            wrapper.style.filter = 'blur(20px)';
-            showUnlockOverlay();
-        } else {
-            lastVisible = Date.now();
-        }
-    });
-    function showUnlockOverlay() {
-        var existing = document.querySelector('.unlock-overlay');
-        if (existing) return;
-        var overlay = document.createElement('div');
-        overlay.className = 'unlock-overlay';
-        overlay.innerHTML = '<div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;font-family:Inter,sans-serif;"><i class="bi bi-shield-lock" style="font-size:4rem;color:#6366f1;"></i><h3 style="color:#fff;margin:0;font-weight:600;">Session interrompue</h3><p style="color:#94a3b8;margin:0;font-size:0.95rem;text-align:center;max-width:400px;">Contenu confidentiel. Cliquez ci-dessous pour accéder aux données.</p><button onclick="unlockPage()" style="background:#6366f1;color:#fff;border:none;padding:12px 32px;border-radius:10px;font-weight:600;font-size:1rem;cursor:pointer;box-shadow:0 4px 20px rgba(99,102,241,0.4);">Accéder au contenu</button></div>';
-        document.body.appendChild(overlay);
-    }
-    function unlockPage() {
-        var overlay = document.querySelector('.unlock-overlay');
-        if (overlay) overlay.remove();
-        var wrapper = document.querySelector('.wrapper');
-        if (wrapper) { wrapper.style.transition = 'filter 0.5s'; wrapper.style.filter = 'none'; }
     }
     function showScreenshotWarning() {
         var existing = document.querySelector('.screenshot-alert');

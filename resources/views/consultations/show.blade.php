@@ -13,7 +13,7 @@
             <button class="btn btn-success"><i class="bi bi-check-circle"></i> Terminer la consultation</button>
         </form>
         @endif
-        @if(in_array(Auth::user()->role, ['admin', 'receptionniste']) && $consultation->statut === 'termine' && !$consultation->facture)
+        @if(Auth::user()->role === 'receptionniste' && $consultation->statut === 'termine' && !$consultation->facture)
         <form method="POST" action="{{ route('factures.generate', $consultation) }}" class="d-inline">
             @csrf
             <button class="btn btn-success"><i class="bi bi-receipt"></i> Générer la facture</button>

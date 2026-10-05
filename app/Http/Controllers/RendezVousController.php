@@ -189,9 +189,12 @@ class RendezVousController extends Controller
 
     public function apiEvents(Request $request)
     {
+        $start = $request->start ?: now()->startOfMonth()->format('Y-m-d');
+        $end = $request->end ?: now()->endOfMonth()->format('Y-m-d');
+
         $query = RendezVous::with(['patient', 'medecin'])
-            ->whereDate('date_rdv', '>=', $request->start)
-            ->whereDate('date_rdv', '<=', $request->end);
+            ->whereDate('date_rdv', '>=', $start)
+            ->whereDate('date_rdv', '<=', $end);
 
         if (Auth::user()->role === 'medecin') {
             $query->where('medecin_id', Auth::id());
@@ -200,7 +203,9 @@ class RendezVousController extends Controller
             $query->where('medecin_id', $request->medecin_id);
         }
 
-        $events = $query->get()->map(function ($rdv) {
+        $isMedecin = Auth::user()->role === 'medecin';
+
+        $events = $query->get()->map(function ($rdv) use ($isMedecin) {
             $colors = [
                 'planifie' => '#f4a100',
                 'confirme' => '#2c7be5',
@@ -221,7 +226,7 @@ class RendezVousController extends Controller
                 'start' => $rdv->date_rdv->format('Y-m-d') . 'T' . $rdv->heure_rdv,
                 'backgroundColor' => $colors[$rdv->statut] ?? '#6c757d',
                 'borderColor' => $colors[$rdv->statut] ?? '#6c757d',
-                'url' => route('rendez-vous.edit', $rdv),
+                'url' => $isMedecin ? route('rendez-vous.show', $rdv) : route('rendez-vous.edit', $rdv),
                 'extendedProps' => [
                     'statut' => $rdv->statut,
                     'motif' => $rdv->motif,

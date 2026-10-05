@@ -7,7 +7,8 @@
 | 1 | Authentification avec 2FA | `01-authentification.puml` | Login avec/sans 2FA (TOTP), challenge, vérification |
 | 2 | Création d'un rendez-vous | `02-creation-rendezvous.puml` | Le réceptionniste planifie un RDV avec contrôle de conflit |
 | 3 | Cycle de vie d'une consultation | `03-consultation.puml` | Confirmation RDV → démarrer → constantes/diagnostic → tarifs → terminer |
-| 4 | Facturation et paiement | `04-facturation-paiement.puml` | Génération facture (manuelle/auto) + enregistrement paiement + PDF |
+| 4a | Génération de la facture | `04a-generation-facture.puml` | Le réceptionniste facture une consultation terminée (contrôle doublon, total des prestations) |
+| 4b | Paiement et export | `04b-paiement-export.puml` | Le réceptionniste enregistre un paiement, notifie et exporte le PDF |
 | 5 | Partage de dossier (propriétaire) | `05-partage-proprietaire.puml` | Médecin A partage ses notes/documents avec Médecin B |
 | 6 | Demande d'accès au dossier | `06-demande-acces.puml` | Médecin B demande l'accès aux notes/documents de Médecin A |
 | 7 | Acceptation / Refus de partage | `07-acceptation-refus-partage.puml` | Le notifié accepte ou refuse une demande de partage |

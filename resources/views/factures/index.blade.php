@@ -5,7 +5,7 @@
     <h4><i class="bi bi-receipt"></i> Factures</h4>
     <div>
         <a href="{{ route('dashboard') }}" class="btn btn-outline-primary me-1"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
-        @if(in_array(Auth::user()->role, ['admin', 'receptionniste']))
+        @if(Auth::user()->role === 'receptionniste')
         <a href="{{ route('factures.create') }}" class="btn btn-primary"><i class="bi bi-plus"></i> Nouvelle facture</a>
         @endif
     </div>

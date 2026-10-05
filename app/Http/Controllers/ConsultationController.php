@@ -76,7 +76,7 @@ class ConsultationController extends Controller
             $consultation->tarifs()->attach($request->tarifs);
         }
 
-        if ($data['rendez_vous_id']) {
+        if (!empty($data['rendez_vous_id'])) {
             RendezVous::where('id', $data['rendez_vous_id'])->update(['statut' => 'termine']);
         }
 
