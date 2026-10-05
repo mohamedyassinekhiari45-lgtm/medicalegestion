@@ -65,6 +65,11 @@ class PatientController extends Controller
 
     public function show(Patient $patient)
     {
+        if (Auth::user()->role === 'medecin' && ! $patient->estTraitePar(Auth::id())) {
+            return redirect()->route('patients.index')
+                ->with('error', "Ce patient ne fait pas partie de votre file : consultez-le uniquement depuis « Mes patients ».");
+        }
+
         $patient->load(['rendezVous' => function($q) {
             $q->latest()->with('medecin.specialites');
         }]);

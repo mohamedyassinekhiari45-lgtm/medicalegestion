@@ -31,8 +31,28 @@ class DossierMedicalController extends Controller
         return User::whereIn('id', $userIds)->where('role', 'medecin')->get();
     }
 
+    /**
+     * Chaque patient appartient aux medecins qui l'ont consulte (ou qui ont
+     * un rendez-vous avec lui). Seul un medecin traitant peut ouvrir le
+     * dossier, ecrire ses notes et deposer des documents.
+     */
+    protected function estMedecinTraitant(Patient $patient): bool
+    {
+        return $patient->estTraitePar(Auth::id());
+    }
+
+    protected function refuserAcces()
+    {
+        return redirect()->route('patients.index')
+            ->with('error', "Ce patient ne fait pas partie de votre file : consultez-le uniquement depuis « Mes patients ».");
+    }
+
     public function show(Patient $patient)
     {
+        if (!$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
+        }
+
         $user = Auth::user();
 
         $dossier = $this->getDossier($patient);
@@ -55,15 +75,6 @@ class DossierMedicalController extends Controller
         );
 
         $traitants = $this->medecinsTraitants($patient);
-        $peutAutoriser = $traitants->where('id', $user->id)->isNotEmpty();
-
-        // All doctors the user can share with (already treated + can grant access)
-        $alreadySharedIds = $dossier->authorizations->where('autorise_par', $user->id)->pluck('medecin_id')->toArray();
-        $medecinsAutorisables = User::with('specialites')
-            ->where('role', 'medecin')
-            ->where('id', '!=', $user->id)
-            ->whereNotIn('id', $alreadySharedIds)
-            ->get();
 
         $medecin = $user;
 
@@ -119,13 +130,16 @@ class DossierMedicalController extends Controller
         return view('dossiers-medicaux.show', compact(
             'dossier', 'patient', 'medecin',
             'mesDocs', 'docsAutorises', 'autresDocs', 'medecinsAutorisesIds',
-            'traitants', 'peutAutoriser', 'medecinsAutorisables',
-            'shareRequests', 'sentRequests', 'requestableMedecins', 'specialites'
+            'traitants', 'shareRequests', 'sentRequests', 'requestableMedecins', 'specialites'
         ));
     }
 
     public function updateNotes(Request $request, Patient $patient)
     {
+        if (!$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
+        }
+
         $user = Auth::user();
         $dossier = $this->getDossier($patient);
         $notes = json_decode($dossier->notes_generales ?? '{}', true);
@@ -138,6 +152,10 @@ class DossierMedicalController extends Controller
 
     public function storeDocument(Request $request, Patient $patient)
     {
+        if (!$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
+        }
+
         $data = $request->validate([
             'type' => 'required|in:ordonnance,bilan,radio,compte_rendu,autre',
             'titre' => 'required|string|max:255',
@@ -159,10 +177,28 @@ class DossierMedicalController extends Controller
         return back()->with('success', 'Document ajouté à votre section du dossier.');
     }
 
+    /**
+     * Un document n'est modifiable que par son auteur, et seulement s'il
+     * est toujours le medecin traitant du patient concerne.
+     */
+    protected function verifierDocument(DocumentMedical $document)
+    {
+        if ((int)$document->uploaded_by !== (int)Auth::id()) {
+            return back()->with('error', 'Vous ne pouvez modifier que vos propres documents.');
+        }
+
+        $patient = optional($document->dossierMedical)->patient;
+        if (!$patient || !$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
+        }
+
+        return null;
+    }
+
     public function updateDocument(Request $request, DocumentMedical $document)
     {
-        if ($document->uploaded_by !== Auth::id()) {
-            return back()->with('error', 'Vous ne pouvez modifier que vos propres documents.');
+        if ($refus = $this->verifierDocument($document)) {
+            return $refus;
         }
 
         $data = $request->validate([
@@ -203,8 +239,13 @@ class DossierMedicalController extends Controller
 
     public function destroyDocument(DocumentMedical $document)
     {
-        if ($document->uploaded_by !== Auth::id()) {
+        if ((int)$document->uploaded_by !== (int)Auth::id()) {
             return back()->with('error', 'Vous ne pouvez supprimer que vos propres documents.');
+        }
+
+        $patient = optional($document->dossierMedical)->patient;
+        if (!$patient || !$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
         }
 
         if ($document->fichier) {
@@ -215,67 +256,12 @@ class DossierMedicalController extends Controller
         return back()->with('success', 'Document supprimé.');
     }
 
-    public function share(Request $request, Patient $patient)
-    {
-        $user = Auth::user();
-        $ownsPatient = $patient->consultations()->where('medecin_id', $user->id)->exists()
-            || $patient->rendezVous()->where('medecin_id', $user->id)->exists();
-        if (!$ownsPatient) {
-            return back()->with('error', 'Vous devez avoir traité ce patient pour partager votre section.');
-        }
-
-        $data = $request->validate([
-            'to_medecin_id' => 'required|exists:users,id',
-            'notes_partagees' => 'nullable|string',
-            'documents_partagees' => 'nullable|string',
-        ]);
-
-        $notesPartagees = !empty($data['notes_partagees']) ? json_decode($data['notes_partagees'], true) : [];
-        $documentsPartagees = !empty($data['documents_partagees']) ? json_decode($data['documents_partagees'], true) : [];
-
-        $medecin = User::findOrFail($data['to_medecin_id']);
-        if ($medecin->role !== 'medecin') {
-            return back()->with('error', 'Vous ne pouvez partager qu\'avec un médecin.');
-        }
-        if ((int)$medecin->id === (int)$user->id) {
-            return back()->with('error', 'Vous ne pouvez pas partager avec vous-même.');
-        }
-
-        $dossier = $this->getDossier($patient);
-
-        // Check existing authorization
-        $exists = $dossier->authorizations()->where('medecin_id', $medecin->id)->where('autorise_par', $user->id)->exists();
-        if ($exists) {
-            return back()->with('error', 'Ce médecin a déjà accès à votre section.');
-        }
-
-        // Check pending share request
-        $pending = ShareRequest::where('dossier_medical_id', $dossier->id)
-            ->where('from_medecin_id', $user->id)
-            ->where('to_medecin_id', $medecin->id)
-            ->where('statut', 'en_attente')
-            ->exists();
-        if ($pending) {
-            return back()->with('error', 'Une demande est déjà en attente pour ce médecin.');
-        }
-
-        $shareRequest = ShareRequest::create([
-            'dossier_medical_id' => $dossier->id,
-            'from_medecin_id' => $user->id,
-            'to_medecin_id' => $medecin->id,
-            'requester_id' => $user->id,
-            'notes_partagees' => $notesPartagees,
-            'documents_partagees' => $documentsPartagees,
-            'statut' => 'en_attente',
-        ]);
-
-        $medecin->notify(new DemandePartage($shareRequest));
-
-        return back()->with('success', 'Demande de partage envoyée à Dr ' . $medecin->prenom . ' ' . $medecin->name . '.');
-    }
-
     public function requestAccess(Request $request, Patient $patient)
     {
+        if (!$this->estMedecinTraitant($patient)) {
+            return $this->refuserAcces();
+        }
+
         $user = Auth::user();
         $data = $request->validate(['medecin_id' => 'required|exists:users,id']);
 
@@ -323,18 +309,11 @@ class DossierMedicalController extends Controller
     public function acceptShare(ShareRequest $shareRequest)
     {
         $user = Auth::user();
-        $isOwnerGrant = (int)$shareRequest->from_medecin_id === (int)$user->id;
-        $isRecipientAccept = (int)$shareRequest->to_medecin_id === (int)$user->id;
 
-        // Owner can accept if someone requested access; recipient can accept if owner shared
-        if (!$isOwnerGrant && !$isRecipientAccept) {
-            return back()->with('error', 'Vous n\'êtes pas concerné par cette demande.');
-        }
-        // If user is the to_medecin_id (recipient of share), only from_medecin_id should accept the request
-        // Actually: when owner initiates share -> recipient accepts. When someone requests -> owner accepts.
-        // So the acceptor is always the one who is NOT the requester.
-        if ((int)$shareRequest->requester_id === (int)$user->id) {
-            return back()->with('error', 'Vous ne pouvez pas accepter votre propre demande.');
+        // Seul le medecin proprietaire de la section peut autoriser un acces.
+        // L acces n'est jamais accorde directement : il fait suite a une demande.
+        if ((int)$shareRequest->from_medecin_id !== (int)$user->id) {
+            return back()->with('error', 'Seul le médecin propriétaire de la section peut accepter cette demande.');
         }
 
         if ($shareRequest->statut !== 'en_attente') {
@@ -372,36 +351,6 @@ class DossierMedicalController extends Controller
 
         return redirect()->route('dossiers-medicaux.show', $shareRequest->dossierMedical->patient_id)
             ->with('success', 'Demande de partage refusée.');
-    }
-
-    public function grantAccess(Request $request, Patient $patient)
-    {
-        $user = Auth::user();
-        $ownsPatient = $patient->consultations()->where('medecin_id', $user->id)->exists()
-            || $patient->rendezVous()->where('medecin_id', $user->id)->exists();
-        if (!$ownsPatient) {
-            return back()->with('error', 'Vous devez avoir traité ce patient pour autoriser l\'accès à votre section.');
-        }
-
-        $data = $request->validate(['medecin_id' => 'required|exists:users,id']);
-        $medecin = User::findOrFail($data['medecin_id']);
-        if ($medecin->role !== 'medecin') {
-            return back()->with('error', 'Vous ne pouvez autoriser qu\'un médecin.');
-        }
-
-        $dossier = $this->getDossier($patient);
-        $exists = $dossier->authorizations()->where('medecin_id', $medecin->id)->where('autorise_par', $user->id)->exists();
-        if ($exists) {
-            return back()->with('error', 'Ce médecin a déjà accès à votre section.');
-        }
-
-        DossierAuthorization::create([
-            'dossier_medical_id' => $dossier->id,
-            'medecin_id' => $medecin->id,
-            'autorise_par' => $user->id,
-        ]);
-
-        return back()->with('success', 'Accès à votre section accordé à Dr ' . $medecin->prenom . ' ' . $medecin->name . '.');
     }
 
     public function revokeAccess(Request $request, DossierAuthorization $authorization)

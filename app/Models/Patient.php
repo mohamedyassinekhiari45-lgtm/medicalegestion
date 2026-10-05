@@ -31,6 +31,24 @@ class Patient extends Model
         });
     }
 
+    /**
+     * Indique si le medecin donne est le medecin traitant de ce patient,
+     * c'est-a-dire s'il l'a consulte ou s'il a un rendez-vous avec lui.
+     */
+    public function estTraitePar($medecinId)
+    {
+        $medecinId = (int) $medecinId;
+        if ($medecinId === 0) {
+            return false;
+        }
+
+        if ($this->consultations()->where('medecin_id', $medecinId)->exists()) {
+            return true;
+        }
+
+        return $this->rendezVous()->where('medecin_id', $medecinId)->exists();
+    }
+
     public function rendezVous()
     {
         return $this->hasMany(RendezVous::class);

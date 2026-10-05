@@ -1,0 +1,66 @@
+@startuml
+title Accès au dossier médical : réservé au médecin traitant
+
+actor "Médecin connecté" as Med
+participant "Patient\n(Model)" as PatM
+participant "PatientController" as PC
+participant "DossierMedical\nController" as DMC
+
+== Règle ==
+note right of Med
+  Un patient appartient aux médecins
+  qui l'ont **consulté** ou qui ont
+  un **rendez-vous** avec lui.
+  Partout ailleurs : redirection.
+end note
+
+== Accès à la fiche patient ==
+Med -> PC: GET /patients/{patient}
+PC -> PatM: estTraitePar(Auth::id())
+alt consultation ou rendez-vous existant
+    PatM --> PC: true
+    PC --> Med: page de la fiche
+else aucune prise en charge
+    PatM --> PC: false
+    PC --> Med: redirect /patients\n"Ce patient ne fait pas partie de votre file"
+end
+
+== Accès au dossier médical ==
+Med -> DMC: GET /patients/{patient}/dossier
+DMC -> PatM: estTraitePar(Auth::id())
+alt patient non traité
+    PatM --> DMC: false
+    DMC --> Med: refuserAcces()\nredirect /patients
+else patient traité
+    PatM --> DMC: true
+    DMC -> DMC: firstOrCreate dossier (patient_id)
+    DMC -> DMC: charge notes, documents,\nautorisations, demandes
+    DMC --> Med: page du dossier\nmes notes / mes documents\n+ sections autorisées en lecture
+end
+
+== Écriture des notes ==
+Med -> DMC: POST /patients/{patient}/dossier/notes
+DMC -> PatM: estTraitePar(Auth::id())
+alt patient non traité
+    DMC --> Med: refuserAcces()
+else
+    DMC -> DMC: notes_generales[Auth::id()] = valeur\n(chacun n'écrit que dans sa section)
+    DMC --> Med: back() "Notes enregistrées"
+end
+
+== Documents : auteur uniquement ==
+Med -> DMC: PUT ou DELETE /documents-medicaux/{document}
+DMC -> DMC: uploaded_by == Auth::id() ?
+alt document d'un autre médecin
+    DMC --> Med: back() "Vous ne pouvez\nmodifier que vos propres documents"
+else
+    DMC -> PatM: estTraitePar(Auth::id())
+    alt n'est plus médecin traitant
+        DMC --> Med: refuserAcces()
+    else
+        DMC -> DMC: mise à jour / suppression\n(remplacement du fichier sécurisé)
+        DMC --> Med: back() succès
+    end
+end
+
+@enduml

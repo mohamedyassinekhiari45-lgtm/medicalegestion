@@ -38,16 +38,10 @@
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Enregistrer mes notes</button>
                 </form>
-                @if($peutAutoriser && !$medecinsAutorisables->isEmpty())
-                <div class="form-check mt-2">
-                    <input type="checkbox" class="form-check-input" id="shareNotesCheck">
-                    <label class="form-check-label" for="shareNotesCheck">Inclure mes notes dans le partage</label>
-                </div>
-                @endif
 
                 @if(count($notes) > 1 || (count($notes) === 1 && !isset($notes[Auth::id()])))
                 <hr>
-                <h6 class="text-muted">Notes partagées</h6>
+                <h6 class="text-muted">Notes des autres médecins</h6>
                 @php $afficheNotes = false; @endphp
                 @foreach($notes as $medId => $note)
                 @if($medId != Auth::id() && $note)
@@ -76,18 +70,10 @@
         <div class="card animate-fade-up mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-file-earmark"></i> Mes documents ({{ $mesDocs->count() }})</span>
-                <div class="d-flex align-items-center gap-2">
-                    @if($peutAutoriser && $mesDocs->isNotEmpty())
-                    <div>
-                        <input type="checkbox" id="selectAllDocs" class="form-check-input me-1">
-                        <label for="selectAllDocs" class="form-check-label small">Tout sélectionner</label>
-                    </div>
-                    @endif
-                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse"
-                        data-bs-target="#addDocumentForm" aria-expanded="false" aria-controls="addDocumentForm">
-                        <i class="bi bi-upload"></i> Ajouter un document
-                    </button>
-                </div>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse"
+                    data-bs-target="#addDocumentForm" aria-expanded="false" aria-controls="addDocumentForm">
+                    <i class="bi bi-upload"></i> Ajouter un document
+                </button>
             </div>
             <div class="card-body">
                 <div class="collapse mb-3" id="addDocumentForm">
@@ -133,7 +119,6 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                @if($peutAutoriser)<th style="width:40px;"></th>@endif
                                 <th>Type</th>
                                 <th>Titre</th>
                                 <th>Description</th>
@@ -145,9 +130,6 @@
                         <tbody>
                             @foreach($mesDocs as $doc)
                             <tr>
-                                @if($peutAutoriser)
-                                <td><input type="checkbox" class="form-check-input doc-check" value="{{ $doc->id }}"></td>
-                                @endif
                                 <td><span class="badge bg-secondary">{{ ucfirst($doc->type) }}</span></td>
                                 <td><strong>{{ $doc->titre }}</strong></td>
                                 <td class="text-muted">{{ Str::limit($doc->description, 50) }}</td>
@@ -178,34 +160,6 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
-                @endif
-
-                @if($peutAutoriser && $mesDocs->isNotEmpty())
-                <div class="border rounded p-3 bg-light mt-3">
-                    <form method="POST" action="{{ route('dossiers-medicaux.share', $patient) }}" id="shareForm">
-                        @csrf
-                        <input type="hidden" name="notes_partagees" id="notesPartageesInput" value="">
-                        <input type="hidden" name="documents_partagees" id="documentsPartageesInput" value="">
-                        <div class="row align-items-end">
-                            <div class="col-md-5 mb-2">
-                                <label class="form-label"><i class="bi bi-person-plus"></i> Partager la sélection avec</label>
-                                <select name="to_medecin_id" class="form-select" required>
-                                    <option value="">-- Choisir un médecin --</option>
-                                    @foreach($medecinsAutorisables as $m)
-                                    <option value="{{ $m->id }}">Dr {{ $m->prenom }} {{ $m->name }} ({{ $m->specialites->pluck('libelle')->implode(', ') }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <label class="form-label">&nbsp;</label>
-                                <div><small class="text-muted" id="shareSummary">Aucune note/document sélectionné</small></div>
-                            </div>
-                            <div class="col-md-4 mb-2 text-end">
-                                <button type="submit" class="btn btn-primary" id="shareBtn" disabled><i class="bi bi-send"></i> Envoyer la demande</button>
-                            </div>
-                        </div>
-                    </form>
                 </div>
                 @endif
             </div>
@@ -268,43 +222,11 @@
         @endif
 
         <div class="card animate-fade-up mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <span><i class="bi bi-shield-check"></i> Accès au dossier</span>
-                @if($peutAutoriser)
-                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#grantAccessForm">
-                    <i class="bi bi-person-plus"></i> Autorisation directe
-                </button>
-                @endif
             </div>
             <div class="card-body">
-                @if($peutAutoriser)
-                <div class="collapse mb-3" id="grantAccessForm">
-                    <div class="border rounded p-3 bg-light">
-                        <h6><i class="bi bi-person-plus"></i> Accorder un accès immédiat à toute ma section</h6>
-                        @if($medecinsAutorisables->isEmpty())
-                        <p class="text-muted mb-0">Aucun médecin à autoriser pour le moment.</p>
-                        @else
-                        <form method="POST" action="{{ route('dossiers-medicaux.grant', $patient) }}" class="row g-2 align-items-end">
-                            @csrf
-                            <div class="col-auto">
-                                <select name="medecin_id" class="form-select" required>
-                                    <option value="">-- Choisir un médecin --</option>
-                                    @foreach($medecinsAutorisables as $m)
-                                    <option value="{{ $m->id }}">Dr {{ $m->prenom }} {{ $m->name }} ({{ $m->specialites->pluck('libelle')->implode(', ') }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-auto">
-                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Autoriser</button>
-                            </div>
-                        </form>
-                        @endif
-                    </div>
-                </div>
-                @endif
-
                 @if($requestableMedecins->isNotEmpty())
-                <hr>
                 <h6 class="text-muted"><i class="bi bi-search"></i> Demander l'accès aux notes d'un médecin</h6>
                 <div class="border rounded p-3 bg-light">
                     <form method="POST" action="{{ route('dossiers-medicaux.request-access', $patient) }}" class="row g-2 align-items-end">
@@ -322,8 +244,7 @@
                         </div>
                     </form>
                 </div>
-                @elseif(!$peutAutoriser)
-                <hr>
+                @else
                 <div class="alert alert-info py-2 mb-0">
                     <i class="bi bi-info-circle"></i> Vous n'avez pas encore traité ce patient. Une fois que vous aurez des consultations ou rendez-vous, vous pourrez demander l'accès aux sections des autres médecins.
                 </div>
@@ -469,48 +390,6 @@
         @endif
     </div>
 </div>
-@if($peutAutoriser)
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var notesCheck = document.getElementById('shareNotesCheck');
-    var docChecks = document.querySelectorAll('.doc-check');
-    var shareBtn = document.getElementById('shareBtn');
-    var shareSummary = document.getElementById('shareSummary');
-    var notesInput = document.getElementById('notesPartageesInput');
-    var docsInput = document.getElementById('documentsPartageesInput');
-    var selectAll = document.getElementById('selectAllDocs');
-
-    function updateShareState() {
-        var notesSelected = notesCheck && notesCheck.checked;
-        var docIds = [];
-        docChecks.forEach(function(c) { if (c.checked) docIds.push(c.value); });
-
-        notesInput.value = notesSelected ? '[' + {{ Auth::id() }} + ']' : '';
-        docsInput.value = JSON.stringify(docIds);
-
-        var parts = [];
-        if (notesSelected) parts.push('Notes');
-        if (docIds.length > 0) parts.push(docIds.length + ' document(s)');
-
-        shareSummary.textContent = parts.length > 0 ? parts.join(', ') : 'Aucune note/document sélectionné';
-        shareBtn.disabled = parts.length === 0 || document.querySelector('[name="to_medecin_id"]').value === '';
-    }
-
-    if (notesCheck) notesCheck.addEventListener('change', updateShareState);
-    docChecks.forEach(function(c) { c.addEventListener('change', updateShareState); });
-    var medecinSelect = document.querySelector('[name="to_medecin_id"]');
-    if (medecinSelect) medecinSelect.addEventListener('change', updateShareState);
-
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            docChecks.forEach(function(c) { c.checked = selectAll.checked; });
-            updateShareState();
-        });
-    }
-});
-</script>
-@endif
-
 {{-- Modale de modification d'un document --}}
 <div class="modal fade" id="editDocModal" tabindex="-1" aria-labelledby="editDocModalLabel" aria-hidden="true">
     <div class="modal-dialog">
