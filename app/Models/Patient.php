@@ -18,6 +18,19 @@ class Patient extends Model
         'date_naissance' => 'date',
     ];
 
+    /**
+     * Restreint la requete aux patients consultes par le medecin donne.
+     * Un patient ayant au moins une consultation avec ce medecin.
+     */
+    public function scopeConsultesPar($query, $medecinId)
+    {
+        return $query->whereIn('id', function ($sub) use ($medecinId) {
+            $sub->select('patient_id')
+                ->from('consultations')
+                ->where('medecin_id', $medecinId);
+        });
+    }
+
     public function rendezVous()
     {
         return $this->hasMany(RendezVous::class);

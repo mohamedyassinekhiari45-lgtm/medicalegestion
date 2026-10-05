@@ -15,6 +15,12 @@ class PatientController extends Controller
     public function index(Request $request)
     {
         $query = Patient::query();
+
+        // Un medecin ne voit que les patients qu'il a consulte
+        if ($request->user()->role === 'medecin') {
+            $query->consultesPar($request->user()->id);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -105,7 +111,14 @@ class PatientController extends Controller
     public function apiSearch(Request $request)
     {
         $search = $request->q;
-        $patients = Patient::where(function($q) use ($search) {
+        $query = Patient::query();
+
+        // Un medecin ne cherche que parmi ses propres patients
+        if ($request->user()->role === 'medecin') {
+            $query->consultesPar($request->user()->id);
+        }
+
+        $patients = $query->where(function($q) use ($search) {
                 $q->where('nom', 'like', "%{$search}%")
                   ->orWhere('prenom', 'like', "%{$search}%")
                   ->orWhere('numero_dossier', 'like', "%{$search}%");

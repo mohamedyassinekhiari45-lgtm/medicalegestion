@@ -1,8 +1,8 @@
 @extends('layouts.app')
-@section('title', 'Liste des Patients')
+@section('title', Auth::user()->role === 'medecin' ? 'Mes Patients' : 'Liste des Patients')
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4><i class="bi bi-people"></i> Patients</h4>
+    <h4><i class="bi bi-people"></i> {{ Auth::user()->role === 'medecin' ? 'Mes patients' : 'Patients' }}</h4>
     <div>
         <a href="{{ route('dashboard') }}" class="btn btn-outline-primary me-1"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
         @if(Auth::user()->role !== 'medecin')
