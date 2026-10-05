@@ -41,8 +41,16 @@ class ShareRequest extends Model
             return false;
         }
 
+        // Valeurs historiques : liste JSON d'identifiants. Avant le perimetre
+        // selectif, une demande portait sur toute la section du proprietaire.
         if (is_array($value)) {
-            return count($value) > 0;
+            return true;
+        }
+        if (is_string($value)) {
+            $decode = json_decode($value, true);
+            if (is_array($decode)) {
+                return true;
+            }
         }
 
         $value = strtolower(trim((string)$value));
